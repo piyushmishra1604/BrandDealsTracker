@@ -73,6 +73,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
       direction: current?.column === column && current.direction === "descending" ? "ascending" : "descending",
     }));
     setExpandedDeal(null);
+    setVisiblePages(1);
   }
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [expandedDeal, setExpandedDeal] = useState<string | null>(null);
@@ -88,13 +89,16 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
     .reduce((sum, deal) => sum + deal.amount, 0);
 
   const pending = totalValue - received;
-  const recentDeals = [...monthlyDeals]
+  const sortedDeals = [...monthlyDeals]
     .sort((a, b) => {
       const column = dateSort?.column ?? "dealDate";
       const comparison = a[column].localeCompare(b[column]);
       return (dateSort?.direction === "ascending" ? comparison : -comparison) || a.id.localeCompare(b.id);
-    })
-    .slice(0, 5);
+    });
+  const pageSize = 10;
+  const [visiblePages, setVisiblePages] = useState(1);
+  const recentDeals = sortedDeals.slice(0, visiblePages * pageSize);
+  const totalPages = Math.ceil(sortedDeals.length / pageSize);
 
   return (
     <div className="min-h-screen bg-[#f0f4f9] p-2 text-[#101c40] sm:p-4">
@@ -140,7 +144,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
             <button
               type="button"
               aria-pressed={selectedMonth === "all"}
-              onClick={() => { setSelectedMonth("all"); setExpandedDeal(null); setDetailsId(null); }}
+              onClick={() => { setSelectedMonth("all"); setExpandedDeal(null); setDetailsId(null); setVisiblePages(1); }}
               className={`shrink-0 cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
                 selectedMonth === "all"
                   ? "bg-[#e8efff] text-[#0655ff]"
@@ -154,7 +158,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
                 key={month}
                 type="button"
                 aria-pressed={selectedMonth === month}
-                onClick={() => { setSelectedMonth(month); setExpandedDeal(null); setDetailsId(null); }}
+                onClick={() => { setSelectedMonth(month); setExpandedDeal(null); setDetailsId(null); setVisiblePages(1); }}
                 className={`shrink-0 cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
                   selectedMonth === month
                     ? "bg-[#e8efff] text-[#0655ff]"
@@ -196,7 +200,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <caption className="sr-only">Up to five deals, sorted by {dateSort?.column === "dueDate" ? "content due date" : "deal date"}, {dateSort?.direction === "ascending" ? "earliest first" : "latest first"}. {selectedMonth === "all" ? "All months." : `Content due in ${monthLabel}.`}</caption>
+              <caption className="sr-only">Up to {recentDeals.length} deals, sorted by {dateSort?.column === "dueDate" ? "content due date" : "deal date"}, {dateSort?.direction === "ascending" ? "earliest first" : "latest first"}. {selectedMonth === "all" ? "All months." : `Content due in ${monthLabel}.`}</caption>
               <thead className="bg-[#f5f7fb] text-xs text-[#405579]">
                 <tr>
                   {["Brand", "Amount"].map((label) => <th key={label} scope="col" className="whitespace-nowrap px-5 py-3 font-medium">{label}</th>)}
@@ -263,6 +267,20 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
               </tbody>
             </table>
           </div>
+          {sortedDeals.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#edf1f8] px-5 py-4">
+              <p className="text-sm text-[#53668e]">Showing {recentDeals.length} of {sortedDeals.length} deals</p>
+              {visiblePages < totalPages && (
+                <button
+                  type="button"
+                  onClick={() => setVisiblePages((current) => current + 1)}
+                  className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-[#0655ff] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+                >
+                  Show more (page {visiblePages + 1} of {totalPages})
+                </button>
+              )}
+            </div>
+          )}
         </section>
         </main>
       </div>
