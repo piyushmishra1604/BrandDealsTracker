@@ -55,11 +55,13 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
     date.setUTCMonth(date.getUTCMonth() - index);
     return date.toISOString().slice(0, 7);
   });
-  const visibleMonths = recentMonths.slice(0, 4);
-  const moreMonths = Array.from(new Set([
+  // Include months with deals (even future ones) so they aren't hidden behind older pills.
+  const allMonths = Array.from(new Set([
     ...recentMonths,
     ...deals.map((deal) => deal.dueDate.slice(0, 7)),
-  ])).filter((month) => !visibleMonths.includes(month)).sort().reverse();
+  ])).sort().reverse();
+  const [monthWindowStart, setMonthWindowStart] = useState(0);
+  const visibleMonths = allMonths.slice(monthWindowStart, monthWindowStart + 4);
 
   const [dateSort, setDateSort] = useState<{
     column: "dealDate" | "dueDate";
@@ -74,7 +76,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
   }
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [expandedDeal, setExpandedDeal] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const monthLabel = selectedMonth === "all" ? "All Months" : formatMonth(selectedMonth, "long");
   const monthlyDeals = selectedMonth === "all"
     ? deals
@@ -126,35 +128,51 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
         >
           <p className="shrink-0 text-sm font-medium text-[#23365d]">View by month:</p>
           <div className="flex min-w-0 flex-wrap items-center gap-2 py-1">
-            {[{ value: "all", label: "All Months" }, ...visibleMonths.map((month) => ({
-              value: month,
-              label: formatMonth(month, "short"),
-            }))].map(({ value, label }) => (
+            <button
+              type="button"
+              aria-label="Show newer months"
+              disabled={monthWindowStart === 0}
+              onClick={() => setMonthWindowStart((current) => Math.max(0, current - 1))}
+              className="shrink-0 cursor-pointer rounded-full bg-[#f5f7fb] px-3 py-2.5 text-sm font-medium text-[#465a80] hover:bg-[#e8edf7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span aria-hidden="true">‹</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={selectedMonth === "all"}
+              onClick={() => { setSelectedMonth("all"); setExpandedDeal(null); setDetailsId(null); }}
+              className={`shrink-0 cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+                selectedMonth === "all"
+                  ? "bg-[#e8efff] text-[#0655ff]"
+                  : "bg-[#f5f7fb] text-[#465a80] hover:bg-[#e8edf7]"
+              }`}
+            >
+              All Months
+            </button>
+            {visibleMonths.map((month) => (
               <button
-                key={value}
+                key={month}
                 type="button"
-                aria-pressed={selectedMonth === value}
-                onClick={() => { setSelectedMonth(value); setExpandedDeal(null); setDetailsId(null); }}
+                aria-pressed={selectedMonth === month}
+                onClick={() => { setSelectedMonth(month); setExpandedDeal(null); setDetailsId(null); }}
                 className={`shrink-0 cursor-pointer rounded-full px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
-                  selectedMonth === value
+                  selectedMonth === month
                     ? "bg-[#e8efff] text-[#0655ff]"
                     : "bg-[#f5f7fb] text-[#465a80] hover:bg-[#e8edf7]"
                 }`}
               >
-                {label}
+                {formatMonth(month, "short")}
               </button>
             ))}
-            <select
-              aria-label="More months"
-              value={moreMonths.includes(selectedMonth) ? selectedMonth : ""}
-              onChange={(event) => { setSelectedMonth(event.target.value); setExpandedDeal(null); setDetailsId(null); }}
-              className={`max-w-full cursor-pointer rounded-full border-0 px-4 py-2.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
-                moreMonths.includes(selectedMonth) ? "bg-[#e8efff] text-[#0655ff]" : "bg-[#f5f7fb] text-[#465a80]"
-              }`}
+            <button
+              type="button"
+              aria-label="Show older months"
+              disabled={monthWindowStart + 4 >= allMonths.length}
+              onClick={() => setMonthWindowStart((current) => Math.min(allMonths.length - 4, current + 1))}
+              className="shrink-0 cursor-pointer rounded-full bg-[#f5f7fb] px-3 py-2.5 text-sm font-medium text-[#465a80] hover:bg-[#e8edf7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <option value="" disabled>More months</option>
-              {moreMonths.map((month) => <option key={month} value={month}>{formatMonth(month, "short")}</option>)}
-            </select>
+              <span aria-hidden="true">›</span>
+            </button>
           </div>
         </section>
 
@@ -256,7 +274,7 @@ function DealDetails({ deal }: { deal: Deal }) {
   const [copyNotice, setCopyNotice] = useState("");
   const phone = deal.contactPhone && /^\+[1-9]\d{6,14}$/.test(deal.contactPhone) ? deal.contactPhone.slice(1) : null;
   const contact = [deal.contactName, deal.contactEmail, deal.contactPhone].filter(Boolean).join("\n");
-  const labels = { Reel: "Instagram Reel", Story: "Instagram Stories", Post: "Instagram Post", Other: "Other deliverable" };
+  const labels = { Reel: "Instagram Reel", Story: "Instagram Stories", Post: "Instagram Post", "Ad Rights": "Ad rights", Other: "Other deliverable" };
   return (
     <div className="rounded-xl border border-[#e9e6f5] bg-gradient-to-br from-[#fff7fa] to-[#f1f6ff] p-4 sm:p-5">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
@@ -277,7 +295,7 @@ function DealDetails({ deal }: { deal: Deal }) {
           {deal.deliverables?.length ? <ul className="space-y-2">
             {deal.deliverables.map((item, index) => <li key={index} className={`flex items-center gap-3 rounded-lg px-3 py-3 ${index % 2 ? "bg-[#f0f5ff]" : "bg-[#fcf0fa]"}`}>
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-5 w-5 shrink-0 text-violet-600"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".7" /></svg>
-              <span className="text-sm">{labels[item.type]}</span><span className="ml-auto whitespace-nowrap text-sm font-semibold">{item.quantity} ×</span>
+              <span className="text-sm">{labels[item.type]}</span><span className="ml-auto whitespace-nowrap text-sm font-semibold">{item.type === "Ad Rights" ? `${item.quantity} month${item.quantity === 1 ? "" : "s"}` : `${item.quantity} ×`}</span>
             </li>)}
           </ul> : <p className="py-4 text-sm text-[#53668e]">No deliverables added yet.</p>}
         </section>
@@ -510,11 +528,11 @@ function DealEditor({ deal, onSave, onCancel }: {
             <div key={index} className="flex flex-wrap items-end gap-3">
               <label className="text-xs text-[#405579]">Type
                 <select aria-label={`Deliverable ${index + 1} type`} value={item.type} onChange={(event) => setDeliverables(current => current.map((entry, i) => i === index ? { ...entry, type: event.target.value as Deliverable["type"] } : entry))} className={inputClass}>
-                  {["Reel", "Story", "Post", "Other"].map(type => <option key={type}>{type}</option>)}
+                  {["Reel", "Story", "Post", "Ad Rights", "Other"].map(type => <option key={type}>{type}</option>)}
                 </select>
               </label>
-              <label className="w-24 text-xs text-[#405579]">Quantity
-                <input aria-label={`Deliverable ${index + 1} quantity`} type="number" required min="1" max="999" step="1" value={Number.isNaN(item.quantity) ? "" : item.quantity} onChange={(event) => setDeliverables(current => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.valueAsNumber } : entry))} className={inputClass} />
+              <label className="w-24 text-xs text-[#405579]">{item.type === "Ad Rights" ? "Months" : "Quantity"}
+                <input aria-label={`Deliverable ${index + 1} ${item.type === "Ad Rights" ? "months" : "quantity"}`} type="number" required min="1" max="999" step="1" value={Number.isNaN(item.quantity) ? "" : item.quantity} onChange={(event) => setDeliverables(current => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.valueAsNumber } : entry))} className={inputClass} />
               </label>
               <button type="button" aria-label={`Remove deliverable ${index + 1}`} onClick={() => setDeliverables(current => current.filter((_, i) => i !== index))} className="cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">Remove</button>
             </div>
