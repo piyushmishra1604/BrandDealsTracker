@@ -198,7 +198,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
               View all <span aria-hidden="true">→</span><span className="sr-only"> (coming soon)</span>
             </button>
           </div>
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">Up to {recentDeals.length} deals, sorted by {dateSort?.column === "dueDate" ? "content due date" : "deal date"}, {dateSort?.direction === "ascending" ? "earliest first" : "latest first"}. {selectedMonth === "all" ? "All months." : `Content due in ${monthLabel}.`}</caption>
               <thead className="bg-[#f5f7fb] text-xs text-[#405579]">
@@ -267,6 +267,51 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
               </tbody>
             </table>
           </div>
+          <div className="divide-y divide-[#edf1f8] sm:hidden">
+            {recentDeals.length === 0 && (
+              <p className="px-5 py-12 text-center text-sm text-[#53668e]">
+                {deals.length === 0 ? "No brand deals yet." : `No brand deals due in ${monthLabel}. Choose another month to see your collaborations.`}
+              </p>
+            )}
+            {recentDeals.map((deal) => (
+              <div key={deal.id}>
+                <div onClick={(event) => {
+                  if ((event.target as HTMLElement).closest("button, a, [popover]")) return;
+                  setDetailsId(detailsId === deal.id ? null : deal.id);
+                }} className={`cursor-pointer px-5 py-4 ${detailsId === deal.id ? "bg-[#f8faff]" : ""}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 font-medium">
+                        <button type="button" aria-label={`Deliverables for ${deal.brand}`} aria-expanded={detailsId === deal.id} aria-controls={`deliverables-${deal.id}`} onClick={() => setDetailsId(detailsId === deal.id ? null : deal.id)} className="shrink-0 cursor-pointer rounded px-1 py-1 text-slate-500 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
+                          <span aria-hidden="true">{detailsId === deal.id ? "▾" : "▸"}</span>
+                        </button>
+                        <span className="break-words">
+                          {isInstagramUrl(deal.instagramUrl) ? (
+                            <a href={deal.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label={`${deal.brand} on Instagram (opens in a new tab)`} className="rounded text-blue-600 underline decoration-blue-200 underline-offset-4 hover:decoration-blue-600 focus-visible:outline-2 focus-visible:outline-blue-600">
+                              {deal.brand}<span aria-hidden="true" className="ml-1 text-xs">↗</span>
+                            </a>
+                          ) : deal.brand}
+                        </span>
+                      </div>
+                      <p className="mt-1 pl-6 text-sm tabular-nums text-[#53668e]">{formatMoney(deal.amount)}</p>
+                    </div>
+                    <DealActions deal={deal} disabled={deletingId !== null} onEdit={() => setExpandedDeal(deal.id)} onDelete={() => void deleteDeal(deal)} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 pl-6 text-xs text-[#53668e]">
+                    <span>Deal: {formatDate(deal.dealDate)}</span>
+                    <span>Due: {formatDate(deal.dueDate)}</span>
+                    <DealStatus deal={deal} />
+                  </div>
+                </div>
+                <div id={`deliverables-${deal.id}`} hidden={detailsId !== deal.id} className="bg-[#f8faff] px-5 py-5">
+                  <DealDetails deal={deal} />
+                </div>
+                <div id={`details-${deal.id}`} hidden={expandedDeal !== deal.id} className="bg-[#f8faff] px-5 py-4">
+                  {expandedDeal === deal.id && <DealEditor deal={deal} onSave={saveDeal} onCancel={() => setExpandedDeal(null)} />}
+                </div>
+              </div>
+            ))}
+          </div>
           {sortedDeals.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#edf1f8] px-5 py-4">
               <p className="text-sm text-[#53668e]">Showing {recentDeals.length} of {sortedDeals.length} deals</p>
@@ -295,12 +340,12 @@ function DealDetails({ deal }: { deal: Deal }) {
   const labels = { Reel: "Instagram Reel", Story: "Instagram Stories", Post: "Instagram Post", "Ad Rights": "Ad rights", Other: "Other deliverable" };
   return (
     <div className="rounded-xl border border-[#e9e6f5] bg-gradient-to-br from-[#fff7fa] to-[#f1f6ff] p-4 sm:p-5">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h3 className="break-words text-xl font-bold">{deal.brand}</h3>
           {deal.category && <p className="mt-1 text-sm text-[#53668e]">{deal.category}</p>}
         </div>
-        <dl className="grid flex-1 grid-cols-2 gap-3 lg:max-w-2xl lg:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-3 sm:flex-1 lg:max-w-2xl lg:grid-cols-4">
           {[{ label: "Deal Date", value: formatDate(deal.dealDate) }, { label: "Content Due", value: formatDate(deal.dueDate) }, { label: "Amount", value: formatMoney(deal.amount) }].map(item => (
             <div key={item.label} className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">{item.label}</dt><dd className="mt-1 text-sm font-medium">{item.value}</dd></div>
           ))}
