@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useId, useRef, useState } from "react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
 import { CloudDashboard } from "./components/cloud-dashboard";
 
@@ -255,7 +255,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
                     </tr>
                     <tr id={`deliverables-${deal.id}`} hidden={detailsId !== deal.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
                       <td colSpan={6} className="px-6 py-5">
-                        <DealDetails deal={deal} />
+                        <DealDetails deal={deal} onSave={persistDeal} />
                       </td>
                     </tr>
                     <tr id={`details-${deal.id}`} hidden={expandedDeal !== deal.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
@@ -306,7 +306,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
                   </div>
                 </div>
                 <div id={`deliverables-${deal.id}`} hidden={detailsId !== deal.id} className="bg-[#f8faff] px-5 py-5">
-                  <DealDetails deal={deal} />
+                  <DealDetails deal={deal} onSave={persistDeal} />
                 </div>
                 <div id={`details-${deal.id}`} hidden={expandedDeal !== deal.id} className="bg-[#f8faff] px-5 py-4">
                   {expandedDeal === deal.id && <DealEditor deal={deal} onSave={saveDeal} onCancel={() => setExpandedDeal(null)} />}
@@ -335,8 +335,50 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
   );
 }
 
-function DealDetails({ deal }: { deal: Deal }) {
+function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Promise<string | null> }) {
   const [copyNotice, setCopyNotice] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [deletingNoteIndex, setDeletingNoteIndex] = useState<number | null>(null);
+  const [notesError, setNotesError] = useState("");
+  const [togglingDeliverable, setTogglingDeliverable] = useState<number | null>(null);
+  const [deliverablesError, setDeliverablesError] = useState("");
+  const noteLines = (deal.notes ?? "").split("\n").filter(line => line.trim());
+  async function addNote() {
+    const trimmed = newNote.trim();
+    if (!trimmed) return;
+    setSavingNotes(true);
+    setNotesError("");
+    try {
+      const stamp = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date());
+      const entry = `[${stamp}] ${trimmed}`;
+      const updatedNotes = deal.notes ? `${deal.notes}\n${entry}` : entry;
+      const error = await onSave({ ...deal, notes: updatedNotes });
+      if (error) setNotesError(error);
+      else setNewNote("");
+    } catch { setNotesError("Could not save the note. Please try again."); }
+    finally { setSavingNotes(false); }
+  }
+  async function deleteNote(index: number) {
+    setDeletingNoteIndex(index);
+    setNotesError("");
+    try {
+      const updatedNotes = noteLines.filter((_, i) => i !== index).join("\n");
+      const error = await onSave({ ...deal, notes: updatedNotes });
+      if (error) setNotesError(error);
+    } catch { setNotesError("Could not delete the note. Please try again."); }
+    finally { setDeletingNoteIndex(null); }
+  }
+  async function toggleDeliverableDone(index: number) {
+    setTogglingDeliverable(index);
+    setDeliverablesError("");
+    try {
+      const updatedDeliverables = (deal.deliverables ?? []).map((item, i) => i === index ? { ...item, done: !item.done } : item);
+      const error = await onSave({ ...deal, deliverables: updatedDeliverables });
+      if (error) setDeliverablesError(error);
+    } catch { setDeliverablesError("Could not update the deliverable. Please try again."); }
+    finally { setTogglingDeliverable(null); }
+  }
   const phone = deal.contactPhone && /^\+[1-9]\d{6,14}$/.test(deal.contactPhone) ? deal.contactPhone.slice(1) : null;
   const contact = [deal.contactName, deal.contactEmail, deal.contactPhone].filter(Boolean).join("\n");
   const labels = { Reel: "Instagram Reel", Story: "Instagram Stories", Post: "Instagram Post", "Ad Rights": "Ad rights", Other: "Other deliverable" };
@@ -359,14 +401,47 @@ function DealDetails({ deal }: { deal: Deal }) {
           <h4 className="mb-3 font-semibold">Deliverables</h4>
           {deal.deliverables?.length ? <ul className="space-y-2">
             {deal.deliverables.map((item, index) => <li key={index} className={`flex items-center gap-3 rounded-lg px-3 py-3 ${index % 2 ? "bg-[#f0f5ff]" : "bg-[#fcf0fa]"}`}>
+              <input
+                type="checkbox"
+                aria-label={`Mark ${labels[item.type]} as done`}
+                checked={!!item.done}
+                disabled={togglingDeliverable !== null}
+                onChange={(event) => { event.stopPropagation(); void toggleDeliverableDone(index); }}
+                onClick={(event) => event.stopPropagation()}
+                className="h-4 w-4 shrink-0 cursor-pointer accent-emerald-600"
+              />
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-5 w-5 shrink-0 text-violet-600"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".7" /></svg>
               <span className="text-sm">{labels[item.type]}</span><span className="ml-auto whitespace-nowrap text-sm font-semibold">{item.type === "Ad Rights" ? `${item.quantity} month${item.quantity === 1 ? "" : "s"}` : `${item.quantity} ×`}</span>
             </li>)}
           </ul> : <p className="py-4 text-sm text-[#53668e]">No deliverables added yet.</p>}
+          {deliverablesError && <p role="alert" className="mt-2 text-xs text-red-700">{deliverablesError}</p>}
         </section>
         <div className="space-y-4">
           <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
-            <h4 className="mb-2 font-semibold">Notes</h4><p className="whitespace-pre-wrap break-words text-sm leading-6 text-[#53668e]">{deal.notes || "No notes added yet."}</p>
+            <h4 className="mb-2 font-semibold">Notes</h4>
+            {noteLines.length ? <ul className="space-y-1">
+              {noteLines.map((line, index) => (
+                <li key={index} className="flex items-start justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50">
+                  <p className="whitespace-pre-wrap break-words text-sm leading-6 text-[#53668e]">{line}</p>
+                  <NoteActions disabled={deletingNoteIndex !== null} onDelete={() => void deleteNote(index)} />
+                </li>
+              ))}
+            </ul> : <p className="text-sm text-[#53668e]">No notes added yet.</p>}
+            <div className="mt-3 border-t border-[#edf1f8] pt-3">
+              <textarea
+                value={newNote}
+                onChange={(event) => setNewNote(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                rows={2}
+                maxLength={1000}
+                placeholder="Add a note…"
+                className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-[#101c40] focus:outline-2 focus:outline-blue-600"
+              />
+              <div className="mt-2 flex items-center gap-3">
+                <button type="button" disabled={savingNotes || !newNote.trim()} onClick={(event) => { event.stopPropagation(); void addNote(); }} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">{savingNotes ? "Adding…" : "Add note"}</button>
+              </div>
+              {notesError && <p role="alert" className="mt-2 text-xs text-red-700">{notesError}</p>}
+            </div>
           </section>
           <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
             <h4 className="mb-2 font-semibold">Contact</h4>
@@ -424,6 +499,47 @@ function DealActions({ deal, onEdit, onDelete, disabled }: { deal: Deal; onEdit:
           Edit
         </button>
         <button type="button" onClick={() => { popover.current?.hidePopover(); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
+          Delete
+        </button>
+      </div>
+    </>
+  );
+}
+
+function NoteActions({ onDelete, disabled }: { onDelete: () => void; disabled: boolean }) {
+  const popover = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const id = useId();
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Note actions"
+        disabled={disabled}
+        popoverTarget={id}
+        onClick={(event) => {
+          event.stopPropagation();
+          const rect = event.currentTarget.getBoundingClientRect();
+          setPosition({
+            top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 68)),
+            left: Math.max(8, Math.min(rect.right - 112, window.innerWidth - 120)),
+          });
+        }}
+        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#405579] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+          <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+        </svg>
+      </button>
+      <div
+        ref={popover}
+        id={id}
+        popover="auto"
+        aria-label="Note actions"
+        style={position}
+        className="fixed m-0 w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+      >
+        <button type="button" onClick={(event) => { event.stopPropagation(); popover.current?.hidePopover(); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
           Delete
         </button>
       </div>

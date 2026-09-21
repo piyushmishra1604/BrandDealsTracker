@@ -1,12 +1,14 @@
 export type Deliverable = {
   type: "Reel" | "Story" | "Post" | "Ad Rights" | "Other";
   quantity: number;
+  done?: boolean;
 };
 
 export function isDeliverables(value: unknown): value is Deliverable[] {
   return Array.isArray(value) && value.length <= 50 && value.every(item =>
     item && typeof item === "object" && ["Reel", "Story", "Post", "Ad Rights", "Other"].includes(item.type)
-    && Number.isInteger(item.quantity) && item.quantity >= 1 && item.quantity <= 999,
+    && Number.isInteger(item.quantity) && item.quantity >= 1 && item.quantity <= 999
+    && (item.done === undefined || typeof item.done === "boolean"),
   );
 }
 
