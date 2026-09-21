@@ -379,6 +379,33 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
     } catch { setDeliverablesError("Could not update the deliverable. Please try again."); }
     finally { setTogglingDeliverable(null); }
   }
+  const [editingContact, setEditingContact] = useState(false);
+  const [contactName, setContactName] = useState(deal.contactName ?? "");
+  const [contactEmail, setContactEmail] = useState(deal.contactEmail ?? "");
+  const [contactPhone, setContactPhone] = useState(deal.contactPhone ?? "");
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactError, setContactError] = useState("");
+  function startEditingContact() {
+    setContactName(deal.contactName ?? "");
+    setContactEmail(deal.contactEmail ?? "");
+    setContactPhone(deal.contactPhone ?? "");
+    setContactError("");
+    setEditingContact(true);
+  }
+  async function saveContact() {
+    const cleanedPhone = contactPhone.replace(/[\s()-]/g, "").trim();
+    if (cleanedPhone && !/^\+[1-9]\d{6,14}$/.test(cleanedPhone)) {
+      setContactError("Enter the WhatsApp number with + and country code (for example +919033012611)."); return;
+    }
+    setSavingContact(true);
+    setContactError("");
+    try {
+      const error = await onSave({ ...deal, contactName: contactName.trim(), contactEmail: contactEmail.trim(), contactPhone: cleanedPhone });
+      if (error) setContactError(error);
+      else setEditingContact(false);
+    } catch { setContactError("Could not save contact details. Please try again."); }
+    finally { setSavingContact(false); }
+  }
   const phone = deal.contactPhone && /^\+[1-9]\d{6,14}$/.test(deal.contactPhone) ? deal.contactPhone.slice(1) : null;
   const contact = [deal.contactName, deal.contactEmail, deal.contactPhone].filter(Boolean).join("\n");
   const labels = { Reel: "Instagram Reel", Story: "Instagram Stories", Post: "Instagram Post", "Ad Rights": "Ad rights", Other: "Other deliverable" };
@@ -444,18 +471,42 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
             </div>
           </section>
           <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
-            <h4 className="mb-2 font-semibold">Contact</h4>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-[#53668e]">{contact || "No contact details added yet."}</p>
-              <div className="flex items-center gap-2">
-                {phone && <a href={`https://wa.me/${phone}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">WhatsApp<span className="sr-only"> (opens in a new tab)</span></a>}
-                {contact && <button type="button" onClick={async () => {
-                  try { await navigator.clipboard.writeText(contact); setCopyNotice("Contact copied."); }
-                  catch { setCopyNotice("Could not copy. Select and copy the contact text above."); }
-                }} className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">Copy contact</button>}
-              </div>
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="font-semibold">Contact</h4>
+              {!editingContact && <button type="button" onClick={(event) => { event.stopPropagation(); startEditingContact(); }} className="cursor-pointer text-xs font-medium text-blue-600 hover:underline">Edit</button>}
             </div>
-            <p role="status" className="mt-2 text-xs text-[#53668e]">{copyNotice}</p>
+            {editingContact ? (
+              <div className="space-y-2" onClick={(event) => event.stopPropagation()}>
+                <label className="block text-xs text-[#405579]">Contact name
+                  <input value={contactName} onChange={(event) => setContactName(event.target.value)} maxLength={120} className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600" />
+                </label>
+                <label className="block text-xs text-[#405579]">Contact email
+                  <input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} type="email" maxLength={254} className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600" />
+                </label>
+                <label className="block text-xs text-[#405579]">WhatsApp number
+                  <input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} type="tel" maxLength={20} placeholder="+91 90330 12611" className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600" />
+                </label>
+                <div className="flex items-center gap-3 pt-1">
+                  <button type="button" disabled={savingContact} onClick={() => void saveContact()} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">{savingContact ? "Saving…" : "Save contact"}</button>
+                  <button type="button" disabled={savingContact} onClick={() => setEditingContact(false)} className="cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-xs">Cancel</button>
+                </div>
+                {contactError && <p role="alert" className="text-xs text-red-700">{contactError}</p>}
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="whitespace-pre-wrap break-words text-sm leading-6 text-[#53668e]">{contact || "No contact details added yet."}</p>
+                  <div className="flex items-center gap-2">
+                    {phone && <a href={`https://wa.me/${phone}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">WhatsApp<span className="sr-only"> (opens in a new tab)</span></a>}
+                    {contact && <button type="button" onClick={async () => {
+                      try { await navigator.clipboard.writeText(contact); setCopyNotice("Contact copied."); }
+                      catch { setCopyNotice("Could not copy. Select and copy the contact text above."); }
+                    }} className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">Copy contact</button>}
+                  </div>
+                </div>
+                <p role="status" className="mt-2 text-xs text-[#53668e]">{copyNotice}</p>
+              </>
+            )}
           </section>
         </div>
       </div>

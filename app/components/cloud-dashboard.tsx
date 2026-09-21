@@ -12,8 +12,6 @@ export function CloudDashboard({ children }: {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true;
@@ -57,34 +55,7 @@ export function CloudDashboard({ children }: {
     } catch { return "Could not delete the deal. Check your connection and try again."; }
   }
 
-  async function importDeals() {
-    setBusy(true);
-    setNotice("");
-    try {
-      const raw = localStorage.getItem("brandtracker-deals-v1");
-      if (!raw) { setNotice("No browser-saved deals were found on this device."); return; }
-      const saved: unknown = JSON.parse(raw);
-      if (!Array.isArray(saved) || !saved.every(isDeal)) throw new Error("Browser-saved deals are invalid. The original data has been left untouched.");
-      const invalidDate = saved.find(deal => dealDateError(deal));
-      if (invalidDate) throw new Error(`${invalidDate.brand}: ${dealDateError(invalidDate)} Correct its dates before importing.`);
-      // Insert missing IDs only. Repeating an import never overwrites newer cloud edits.
-      const rows = saved;
-      if (rows.length) {
-        const { error } = await getSupabase().from("deals").upsert(rows, { onConflict: "id", ignoreDuplicates: true });
-        if (error) throw new Error(error.message);
-      }
-      setRetry(value => value + 1);
-      setNotice("Import finished. Existing cloud deals were kept; your browser copy is unchanged.");
-    } catch (err) { setNotice(err instanceof Error ? err.message : "Import failed. Your browser copy is unchanged."); }
-    finally { setBusy(false); }
-  }
-
   return <>
-    <div className="flex flex-wrap items-center justify-end gap-3 bg-[#f0f4f9] px-6 pt-3 text-sm">
-      <span>BrandTracker</span>
-      <button className={button} disabled={!loaded || busy} onClick={importDeals}>{busy ? "Importing…" : "Import browser deals"}</button>
-    </div>
-    {notice && <p role="status" className="bg-[#f0f4f9] px-6 py-3 text-sm">{notice}</p>}
     {error && <div role="alert" className="p-6 text-red-700">{error} <button className={button} onClick={() => setRetry(value => value + 1)}>Retry loading</button></div>}
     {loaded ? children(deals, save, remove) : !error && <p role="status" className="p-8">Loading your deals…</p>}
   </>;
