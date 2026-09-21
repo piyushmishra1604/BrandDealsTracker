@@ -118,7 +118,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
             </p>
           </div>
 
-          <button type="button" onClick={() => setNewDeal({ id: crypto.randomUUID(), brand: "", amount: 0, dealDate: todayDate(), dueDate: todayDate(), contentCreated: false, posted: false, moneyReceived: false })} className="rounded-lg bg-[#243657] px-5 py-3 text-sm font-semibold text-white shadow-[0_3px_10px_#20345c20] transition-colors hover:bg-[#172846] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+          <button type="button" onClick={() => setNewDeal({ id: crypto.randomUUID(), brand: "", amount: 0, dealDate: todayDate(), dueDate: todayDate(), contentCreated: false, sentToBrand: false, posted: false, moneyReceived: false })} className="rounded-lg bg-[#243657] px-5 py-3 text-sm font-semibold text-white shadow-[0_3px_10px_#20345c20] transition-colors hover:bg-[#172846] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
             + Add Brand Deal
           </button>
         </div>
@@ -486,19 +486,21 @@ function StatCard({ title, value, icon }: {
 
 
 
-function getDealStatus(deal: Pick<Deal, "contentCreated" | "posted" | "moneyReceived">) {
-  if (deal.contentCreated && deal.posted) {
-    return deal.moneyReceived ? "Completed" : "Pending Payment";
-  }
-  return deal.contentCreated || deal.posted ? "In Progress" : "Not Started";
+function getDealStatus(deal: Pick<Deal, "contentCreated" | "sentToBrand" | "posted" | "moneyReceived">) {
+  if (deal.moneyReceived) return "Settled";
+  if (deal.posted) return "Posted";
+  if (deal.sentToBrand) return "Sent to Brand";
+  if (deal.contentCreated) return "Created";
+  return "Not Started";
 }
 
 function DealStatus({ deal }: { deal: Deal }) {
   const status = getDealStatus(deal);
   const colors = {
-    Completed: "bg-[#d9f5e8] text-[#087a4d]",
-    "Pending Payment": "bg-[#fff1d3] text-[#a36505]",
-    "In Progress": "bg-[#e8efff] text-[#0655ff]",
+    Settled: "bg-[#d9f5e8] text-[#087a4d]",
+    Posted: "bg-[#fff1d3] text-[#a36505]",
+    "Sent to Brand": "bg-[#e8efff] text-[#0655ff]",
+    Created: "bg-[#f1e9ff] text-[#6b21d8]",
     "Not Started": "bg-slate-100 text-slate-600",
   };
   return <span className={`inline-flex whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ${colors[status]}`}>{status}</span>;
@@ -542,21 +544,24 @@ function DealEditor({ deal, onSave, onCancel }: {
         category: String(form.get("category") ?? "").trim(),
         contactName: String(form.get("contactName") ?? "").trim(),
         contactEmail: String(form.get("contactEmail") ?? "").trim(),
-        contactPhone: String(form.get("contactPhone") ?? "").trim(),
+        contactPhone: String(form.get("contactPhone") ?? "").replace(/[\s()-]/g, "").trim(),
         amount: Number(form.get("amount")),
         dealDate: String(form.get("dealDate")),
         dueDate: String(form.get("dueDate")),
         contentCreated: form.has("contentCreated"),
+        sentToBrand: form.has("sentToBrand"),
         posted: form.has("posted"),
         moneyReceived: form.has("moneyReceived"),
       };
       if (updated.contactPhone && !/^\+[1-9]\d{6,14}$/.test(updated.contactPhone)) {
-        setError("Enter the WhatsApp number with + and country code, without spaces (for example +491234567890)."); return;
+        setError("Enter the WhatsApp number with + and country code (for example +919033012611 or +491234567890)."); return;
       }
       if (!isDeal(updated)) { setError("Enter a brand name, a valid amount, and valid dates."); return; }
       const dateError = dealDateError(updated);
       if (dateError) { setError(dateError); return; }
-      if (updated.posted && !updated.contentCreated) { setError("Mark content as created before marking it as posted."); return; }
+      if (updated.sentToBrand && !updated.contentCreated) { setError("Mark content as created before marking it as sent to the brand."); return; }
+      if (updated.posted && !updated.sentToBrand) { setError("Mark content as sent to the brand before marking it as posted."); return; }
+      if (updated.moneyReceived && !updated.posted) { setError("Mark content as posted before marking money as received."); return; }
       setSaving(true);
       try { setError(await onSave(updated) ?? ""); }
       catch { setError("Could not save. Please try again."); }
@@ -576,7 +581,7 @@ function DealEditor({ deal, onSave, onCancel }: {
         <label className="text-xs text-[#405579]">Category<input name="category" maxLength={120} defaultValue={deal.category ?? ""} placeholder="Lifestyle • Accessories" className={inputClass} /></label>
         <label className="text-xs text-[#405579]">Contact name<input name="contactName" maxLength={120} defaultValue={deal.contactName ?? ""} className={inputClass} /></label>
         <label className="text-xs text-[#405579]">Contact email<input name="contactEmail" type="email" maxLength={254} defaultValue={deal.contactEmail ?? ""} className={inputClass} /></label>
-        <label className="text-xs text-[#405579]">WhatsApp number<input name="contactPhone" type="tel" maxLength={16} defaultValue={deal.contactPhone ?? ""} placeholder="+491234567890" className={inputClass} /><span className="mt-1 block">Include + and country code, without spaces.</span></label>
+        <label className="text-xs text-[#405579]">WhatsApp number<input name="contactPhone" type="tel" maxLength={20} defaultValue={deal.contactPhone ?? ""} placeholder="+91 90330 12611" className={inputClass} /><span className="mt-1 block">Include + and country code. Spaces are fine.</span></label>
       </fieldset>
       <label className="mt-4 block text-xs text-[#405579]">
         Instagram link (optional)
@@ -609,7 +614,7 @@ function DealEditor({ deal, onSave, onCancel }: {
       <fieldset className="mt-5">
         <legend className="mb-3 text-sm font-medium">Update progress</legend>
         <div className="flex flex-wrap gap-5">
-          {([['contentCreated', 'Content created'], ['posted', 'Posted'], ['moneyReceived', 'Money received']] as const).map(([name, label]) => (
+          {([['contentCreated', 'Created'], ['sentToBrand', 'Sent to Brand'], ['posted', 'Posted'], ['moneyReceived', 'Settled']] as const).map(([name, label]) => (
             <label key={name} className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" name={name} defaultChecked={deal[name]} className="h-4 w-4 accent-blue-600" />{label}</label>
           ))}
         </div>
