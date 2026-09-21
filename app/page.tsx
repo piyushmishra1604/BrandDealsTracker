@@ -234,7 +234,8 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
                       setDetailsId(detailsId === deal.id ? null : deal.id);
                     }} className={`cursor-pointer border-t border-[#edf1f8] hover:bg-[#fafbfe] ${detailsId === deal.id ? "bg-[#f8faff]" : ""}`}>
 
-                      <td className="min-w-32 px-5 py-4 font-medium">
+                      <td className="relative min-w-32 px-5 py-4 font-medium">
+                        <StatusCorner deal={deal} />
                         <button type="button" aria-label={`Deliverables for ${deal.brand}`} aria-expanded={detailsId === deal.id} aria-controls={`deliverables-${deal.id}`} onClick={() => setDetailsId(detailsId === deal.id ? null : deal.id)} className="mr-2 cursor-pointer rounded px-1 py-1 text-slate-500 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
                           <span aria-hidden="true">{detailsId === deal.id ? "▾" : "▸"}</span>
                         </button>
@@ -278,7 +279,8 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
                 <div onClick={(event) => {
                   if ((event.target as HTMLElement).closest("button, a, [popover]")) return;
                   setDetailsId(detailsId === deal.id ? null : deal.id);
-                }} className={`cursor-pointer px-5 py-4 ${detailsId === deal.id ? "bg-[#f8faff]" : ""}`}>
+                }} className={`relative cursor-pointer px-5 py-4 ${detailsId === deal.id ? "bg-[#f8faff]" : ""}`}>
+                  <StatusCorner deal={deal} />
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 font-medium">
@@ -494,13 +496,31 @@ function getDealStatus(deal: Pick<Deal, "contentCreated" | "sentToBrand" | "post
   return "Not Started";
 }
 
+// Not Started, in-progress stages, and Settled each get one corner-flag color.
+function getStatusCornerColor(status: string) {
+  if (status === "Not Started") return "#eab308";
+  if (status === "Settled") return "#ef4444";
+  return "#22c55e";
+}
+
+function StatusCorner({ deal }: { deal: Deal }) {
+  const status = getDealStatus(deal);
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute left-0 top-0 h-0 w-0 border-r-[14px] border-t-[14px] border-r-transparent"
+      style={{ borderTopColor: getStatusCornerColor(status) }}
+    />
+  );
+}
+
 function DealStatus({ deal }: { deal: Deal }) {
   const status = getDealStatus(deal);
   const colors = {
     Settled: "bg-[#d9f5e8] text-[#087a4d]",
-    Posted: "bg-[#fff1d3] text-[#a36505]",
+    Posted: "bg-[#e8efff] text-[#0655ff]",
     "Sent to Brand": "bg-[#e8efff] text-[#0655ff]",
-    Created: "bg-[#f1e9ff] text-[#6b21d8]",
+    Created: "bg-[#e8efff] text-[#0655ff]",
     "Not Started": "bg-slate-100 text-slate-600",
   };
   return <span className={`inline-flex whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ${colors[status]}`}>{status}</span>;
