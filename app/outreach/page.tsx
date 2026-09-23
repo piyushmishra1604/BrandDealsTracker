@@ -182,7 +182,7 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
                     </tr>
                     <tr id={`outreach-details-${item.id}`} hidden={detailsId !== item.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
                       <td colSpan={7} className="px-6 py-5">
-                        <OutreachDetails item={item} />
+                        <OutreachDetails item={item} onSave={saveOutreach} />
                       </td>
                     </tr>
                     {expandedId === item.id && (
@@ -229,7 +229,7 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
                   </div>
                 </div>
                 <div id={`outreach-details-${item.id}`} hidden={detailsId !== item.id} className="bg-[#f8faff] px-5 py-5">
-                  <OutreachDetails item={item} />
+                  <OutreachDetails item={item} onSave={saveOutreach} />
                 </div>
                 {expandedId === item.id && (
                   <div className="bg-[#f8faff] px-5 py-4">
@@ -306,24 +306,120 @@ function OutreachEditor({ item, onSave, onCancel }: {
   );
 }
 
-function OutreachDetails({ item }: { item: Outreach }) {
+function OutreachDetails({ item, onSave }: { item: Outreach; onSave: (item: Outreach) => Promise<string | null> }) {
+  const inputClass = "mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600";
+
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [contactPerson, setContactPerson] = useState(item.contactPerson ?? "");
+  const [contactRole, setContactRole] = useState(item.contactRole ?? "");
+  const [source, setSource] = useState(item.source);
+  const [dateReachedOut, setDateReachedOut] = useState(item.dateReachedOut);
+  const [status, setStatus] = useState(item.status);
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [infoError, setInfoError] = useState("");
+
+  function startEditingInfo() {
+    setContactPerson(item.contactPerson ?? "");
+    setContactRole(item.contactRole ?? "");
+    setSource(item.source);
+    setDateReachedOut(item.dateReachedOut);
+    setStatus(item.status);
+    setInfoError("");
+    setEditingInfo(true);
+  }
+  async function saveInfo() {
+    const updated: Outreach = { ...item, contactPerson: contactPerson.trim(), contactRole: contactRole.trim(), source, dateReachedOut, status };
+    if (!isOutreach(updated)) { setInfoError("Enter a valid date reached out."); return; }
+    setSavingInfo(true);
+    setInfoError("");
+    try {
+      const error = await onSave(updated);
+      if (error) setInfoError(error);
+      else setEditingInfo(false);
+    } catch { setInfoError("Could not save. Please try again."); }
+    finally { setSavingInfo(false); }
+  }
+
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notes, setNotes] = useState(item.notes ?? "");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesError, setNotesError] = useState("");
+
+  function startEditingNotes() {
+    setNotes(item.notes ?? "");
+    setNotesError("");
+    setEditingNotes(true);
+  }
+  async function saveNotes() {
+    setSavingNotes(true);
+    setNotesError("");
+    try {
+      const error = await onSave({ ...item, notes: notes.trim() });
+      if (error) setNotesError(error);
+      else setEditingNotes(false);
+    } catch { setNotesError("Could not save notes. Please try again."); }
+    finally { setSavingNotes(false); }
+  }
+
   return (
     <div className="rounded-xl border border-[#e9e6f5] bg-gradient-to-br from-[#fff7fa] to-[#f1f6ff] p-4 sm:p-5">
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h3 className="break-words text-xl font-bold">{item.brandName}</h3>
-          {item.contactRole && <p className="mt-1 text-sm text-[#53668e]">{item.contactRole}</p>}
-        </div>
-        <dl className="grid grid-cols-2 gap-3 sm:flex-1 lg:max-w-2xl lg:grid-cols-4">
-          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Contact Person</dt><dd className="mt-1 text-sm font-medium">{item.contactPerson || "—"}</dd></div>
-          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Source</dt><dd className="mt-1"><SourceBadge source={item.source} /></dd></div>
-          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Date Reached Out</dt><dd className="mt-1 text-sm font-medium">{formatDate(item.dateReachedOut)}</dd></div>
-          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="mb-1 text-xs text-[#53668e]">Status</dt><dd><OutreachStatusBadge status={item.status} /></dd></div>
-        </dl>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="break-words text-xl font-bold">{item.brandName}</h3>
+        {!editingInfo && <button type="button" onClick={(event) => { event.stopPropagation(); startEditingInfo(); }} className="cursor-pointer text-xs font-medium text-blue-600 hover:underline">Edit</button>}
       </div>
+      {editingInfo ? (
+        <div className="mb-5 rounded-xl border border-[#e5ebf5] bg-white p-4" onClick={(event) => event.stopPropagation()}>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <label className="text-xs text-[#405579]">Contact person<input value={contactPerson} onChange={(event) => setContactPerson(event.target.value)} maxLength={120} className={inputClass} /></label>
+            <label className="text-xs text-[#405579]">Contact role<input value={contactRole} onChange={(event) => setContactRole(event.target.value)} maxLength={120} className={inputClass} /></label>
+            <label className="text-xs text-[#405579]">Source
+              <select value={source} onChange={(event) => setSource(event.target.value as OutreachSource)} className={inputClass}>
+                {outreachSources.map(value => <option key={value}>{value}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-[#405579]">Date reached out<input type="date" value={dateReachedOut} onChange={(event) => setDateReachedOut(event.target.value)} min="0001-01-01" max="9999-12-31" className={inputClass} /></label>
+            <label className="text-xs text-[#405579]">Status
+              <select value={status} onChange={(event) => setStatus(event.target.value as OutreachStatus)} className={inputClass}>
+                {outreachStatuses.map(value => <option key={value}>{value}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button type="button" disabled={savingInfo} onClick={() => void saveInfo()} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">{savingInfo ? "Saving…" : "Save changes"}</button>
+            <button type="button" disabled={savingInfo} onClick={() => setEditingInfo(false)} className="cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-xs">Cancel</button>
+          </div>
+          {infoError && <p role="alert" className="mt-2 text-xs text-red-700">{infoError}</p>}
+        </div>
+      ) : (
+        <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            {item.contactRole && <p className="text-sm text-[#53668e]">{item.contactRole}</p>}
+          </div>
+          <dl className="grid grid-cols-2 gap-3 sm:flex-1 lg:max-w-2xl lg:grid-cols-4">
+            <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Contact Person</dt><dd className="mt-1 text-sm font-medium">{item.contactPerson || "—"}</dd></div>
+            <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Source</dt><dd className="mt-1"><SourceBadge source={item.source} /></dd></div>
+            <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Date Reached Out</dt><dd className="mt-1 text-sm font-medium">{formatDate(item.dateReachedOut)}</dd></div>
+            <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="mb-1 text-xs text-[#53668e]">Status</dt><dd><OutreachStatusBadge status={item.status} /></dd></div>
+          </dl>
+        </div>
+      )}
       <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
-        <h4 className="mb-2 font-semibold">Notes</h4>
-        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-[#53668e]">{item.notes || "No notes added yet."}</p>
+        <div className="mb-2 flex items-center justify-between">
+          <h4 className="font-semibold">Notes</h4>
+          {!editingNotes && <button type="button" onClick={(event) => { event.stopPropagation(); startEditingNotes(); }} className="cursor-pointer text-xs font-medium text-blue-600 hover:underline">Edit</button>}
+        </div>
+        {editingNotes ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} maxLength={5000} placeholder="What was discussed, next steps, etc…" className={inputClass} />
+            <div className="mt-2 flex items-center gap-3">
+              <button type="button" disabled={savingNotes} onClick={() => void saveNotes()} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">{savingNotes ? "Saving…" : "Save notes"}</button>
+              <button type="button" disabled={savingNotes} onClick={() => setEditingNotes(false)} className="cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-xs">Cancel</button>
+            </div>
+            {notesError && <p role="alert" className="mt-2 text-xs text-red-700">{notesError}</p>}
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-[#53668e]">{item.notes || "No notes added yet."}</p>
+        )}
       </section>
     </div>
   );
