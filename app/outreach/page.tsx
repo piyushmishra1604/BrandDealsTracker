@@ -50,12 +50,14 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [newOutreach, setNewOutreach] = useState<Outreach | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   async function deleteOutreach(item: Outreach) {
     if (deletingId || !window.confirm(`Delete the outreach record for ${item.brandName}? This permanently removes it and cannot be undone.`)) return;
     setDeletingId(item.id);
     setExpandedId(null);
+    setDetailsId(null);
     setNotice("");
     try {
       const error = await removeOutreach(item.id);
@@ -158,9 +160,15 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
                 )}
                 {filteredOutreach.map((item) => (
                   <Fragment key={item.id}>
-                    <tr className="border-t border-[#edf1f8] hover:bg-[#fafbfe]">
+                    <tr onClick={(event) => {
+                      if ((event.target as HTMLElement).closest("button, a, [popover]")) return;
+                      setDetailsId(detailsId === item.id ? null : item.id);
+                    }} className={`cursor-pointer border-t border-[#edf1f8] hover:bg-[#fafbfe] ${detailsId === item.id ? "bg-[#f8faff]" : ""}`}>
                       <td className="relative min-w-32 px-5 py-4 font-medium">
                         <OutreachCorner status={item.status} />
+                        <button type="button" aria-label={`Details for ${item.brandName}`} aria-expanded={detailsId === item.id} aria-controls={`outreach-details-${item.id}`} onClick={() => setDetailsId(detailsId === item.id ? null : item.id)} className="mr-2 cursor-pointer rounded px-1 py-1 text-slate-500 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
+                          <span aria-hidden="true">{detailsId === item.id ? "▾" : "▸"}</span>
+                        </button>
                         {item.brandName}
                       </td>
                       <td className="whitespace-nowrap px-5 py-4">{item.contactPerson || "—"}</td>
@@ -170,6 +178,11 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
                       <td className="px-5 py-4"><OutreachStatusBadge status={item.status} /></td>
                       <td className="px-3 py-2">
                         <OutreachActions item={item} disabled={deletingId !== null} onEdit={() => setExpandedId(item.id)} onDelete={() => void deleteOutreach(item)} />
+                      </td>
+                    </tr>
+                    <tr id={`outreach-details-${item.id}`} hidden={detailsId !== item.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
+                      <td colSpan={7} className="px-6 py-5">
+                        <OutreachDetails item={item} />
                       </td>
                     </tr>
                     {expandedId === item.id && (
@@ -192,20 +205,31 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
             )}
             {filteredOutreach.map((item) => (
               <div key={item.id}>
-                <div className="relative px-5 py-4">
+                <div onClick={(event) => {
+                  if ((event.target as HTMLElement).closest("button, a, [popover]")) return;
+                  setDetailsId(detailsId === item.id ? null : item.id);
+                }} className={`relative cursor-pointer px-5 py-4 ${detailsId === item.id ? "bg-[#f8faff]" : ""}`}>
                   <OutreachCorner status={item.status} />
                   <div className="flex items-start justify-between gap-3 pl-3">
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium">{item.brandName}</p>
-                      {item.contactPerson && <p className="mt-1 text-sm text-[#53668e]">{item.contactPerson}</p>}
+                      <div className="flex items-center gap-1 font-medium">
+                        <button type="button" aria-label={`Details for ${item.brandName}`} aria-expanded={detailsId === item.id} aria-controls={`outreach-details-${item.id}`} onClick={() => setDetailsId(detailsId === item.id ? null : item.id)} className="shrink-0 cursor-pointer rounded px-1 py-1 text-slate-500 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
+                          <span aria-hidden="true">{detailsId === item.id ? "▾" : "▸"}</span>
+                        </button>
+                        <span>{item.brandName}</span>
+                      </div>
+                      {item.contactPerson && <p className="mt-1 pl-6 text-sm text-[#53668e]">{item.contactPerson}</p>}
                     </div>
                     <OutreachActions item={item} disabled={deletingId !== null} onEdit={() => setExpandedId(item.id)} onDelete={() => void deleteOutreach(item)} />
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 pl-3 text-xs text-[#53668e]">
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 pl-6 text-xs text-[#53668e]">
                     <SourceBadge source={item.source} />
                     <span>Reached out: {formatDate(item.dateReachedOut)}</span>
                     <OutreachStatusBadge status={item.status} />
                   </div>
+                </div>
+                <div id={`outreach-details-${item.id}`} hidden={detailsId !== item.id} className="bg-[#f8faff] px-5 py-5">
+                  <OutreachDetails item={item} />
                 </div>
                 {expandedId === item.id && (
                   <div className="bg-[#f8faff] px-5 py-4">
@@ -279,6 +303,29 @@ function OutreachEditor({ item, onSave, onCancel }: {
       </div>
       </fieldset>
     </form>
+  );
+}
+
+function OutreachDetails({ item }: { item: Outreach }) {
+  return (
+    <div className="rounded-xl border border-[#e9e6f5] bg-gradient-to-br from-[#fff7fa] to-[#f1f6ff] p-4 sm:p-5">
+      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="break-words text-xl font-bold">{item.brandName}</h3>
+          {item.contactRole && <p className="mt-1 text-sm text-[#53668e]">{item.contactRole}</p>}
+        </div>
+        <dl className="grid grid-cols-2 gap-3 sm:flex-1 lg:max-w-2xl lg:grid-cols-4">
+          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Contact Person</dt><dd className="mt-1 text-sm font-medium">{item.contactPerson || "—"}</dd></div>
+          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Source</dt><dd className="mt-1"><SourceBadge source={item.source} /></dd></div>
+          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">Date Reached Out</dt><dd className="mt-1 text-sm font-medium">{formatDate(item.dateReachedOut)}</dd></div>
+          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="mb-1 text-xs text-[#53668e]">Status</dt><dd><OutreachStatusBadge status={item.status} /></dd></div>
+        </dl>
+      </div>
+      <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
+        <h4 className="mb-2 font-semibold">Notes</h4>
+        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-[#53668e]">{item.notes || "No notes added yet."}</p>
+      </section>
+    </div>
   );
 }
 
