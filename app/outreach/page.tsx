@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { todayDate } from "@/lib/deals";
 import { type Outreach, type OutreachSource, type OutreachStatus, outreachSources, outreachStatuses, isOutreach } from "@/lib/outreach";
 import { CloudOutreach } from "../components/cloud-outreach";
@@ -285,6 +285,8 @@ function OutreachEditor({ item, onSave, onCancel }: {
 function OutreachActions({ item, disabled, onEdit, onDelete }: {
   item: Outreach; disabled: boolean; onEdit: () => void; onDelete: () => void;
 }) {
+  const popover = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const id = `outreach-actions-${item.id}`;
   return (
     <>
@@ -293,6 +295,13 @@ function OutreachActions({ item, disabled, onEdit, onDelete }: {
         aria-label={`Actions for ${item.brandName}`}
         disabled={disabled}
         popoverTarget={id}
+        onClick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          setPosition({
+            top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 108)),
+            left: Math.max(8, Math.min(rect.right - 128, window.innerWidth - 136)),
+          });
+        }}
         className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[#405579] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
@@ -300,15 +309,17 @@ function OutreachActions({ item, disabled, onEdit, onDelete }: {
         </svg>
       </button>
       <div
+        ref={popover}
         id={id}
         popover="auto"
         aria-label={`Actions for ${item.brandName}`}
-        className="m-0 w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+        style={position}
+        className="fixed m-0 w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
       >
-        <button type="button" popoverTarget={id} popoverTargetAction="hide" onClick={onEdit} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-[#101c40] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
+        <button type="button" onClick={() => { popover.current?.hidePopover(); onEdit(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-[#101c40] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
           Edit
         </button>
-        <button type="button" popoverTarget={id} popoverTargetAction="hide" onClick={onDelete} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
+        <button type="button" onClick={() => { popover.current?.hidePopover(); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
           Delete
         </button>
       </div>
