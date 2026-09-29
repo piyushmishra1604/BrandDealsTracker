@@ -344,7 +344,18 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
   const [notesError, setNotesError] = useState("");
   const [togglingDeliverable, setTogglingDeliverable] = useState<number | null>(null);
   const [deliverablesError, setDeliverablesError] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const noteLines = (deal.notes ?? "").split("\n").filter(line => line.trim());
+  async function changeStatus(status: DealStatusOption) {
+    setSavingStatus(true);
+    setStatusError("");
+    try {
+      const error = await onSave({ ...deal, ...getDealStatusFields(status) });
+      if (error) setStatusError(error);
+    } catch { setStatusError("Could not update status. Please try again."); }
+    finally { setSavingStatus(false); }
+  }
   async function addNote() {
     const trimmed = newNote.trim();
     if (!trimmed) return;
@@ -421,8 +432,23 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
           {[{ label: "Deal Date", value: formatDate(deal.dealDate) }, { label: "Content Due", value: formatDate(deal.dueDate) }, { label: "Amount", value: formatMoney(deal.amount) }].map(item => (
             <div key={item.label} className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="text-xs text-[#53668e]">{item.label}</dt><dd className="mt-1 text-sm font-medium">{item.value}</dd></div>
           ))}
-          <div className="rounded-lg border border-white bg-white/80 px-4 py-3"><dt className="mb-1 text-xs text-[#53668e]">Status</dt><dd><DealStatus deal={deal} /></dd></div>
+          <div className="rounded-lg border border-white bg-white/80 px-4 py-3">
+            <dt className="mb-1 text-xs text-[#53668e]">Status</dt>
+            <dd>
+              <select
+                aria-label="Deal status"
+                value={getDealStatus(deal)}
+                disabled={savingStatus}
+                onChange={(event) => void changeStatus(event.target.value as DealStatusOption)}
+                onClick={(event) => event.stopPropagation()}
+                className="w-full cursor-pointer rounded-md border-0 bg-transparent px-0 py-0.5 text-xs font-medium focus:outline-2 focus:outline-blue-600 disabled:opacity-50"
+              >
+                {dealStatusOptions.map(status => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </dd>
+          </div>
         </dl>
+        {statusError && <p role="alert" className="mt-2 w-full text-xs text-red-700">{statusError}</p>}
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">
         <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
@@ -632,6 +658,21 @@ function getDealStatus(deal: Pick<Deal, "contentCreated" | "sentToBrand" | "post
   if (deal.sentToBrand) return "Sent to Brand";
   if (deal.contentCreated) return "Created";
   return "Not Started";
+}
+
+const dealStatusOptions = ["Not Started", "Created", "Sent to Brand", "Posted", "Settled"] as const;
+type DealStatusOption = typeof dealStatusOptions[number];
+
+// Each stage implies every earlier stage is also complete.
+function getDealStatusFields(status: DealStatusOption) {
+  const order: DealStatusOption[] = ["Not Started", "Created", "Sent to Brand", "Posted", "Settled"];
+  const index = order.indexOf(status);
+  return {
+    contentCreated: index >= 1,
+    sentToBrand: index >= 2,
+    posted: index >= 3,
+    moneyReceived: index >= 4,
+  };
 }
 
 // Not Started, in-progress stages, and Settled each get one corner-flag color.
