@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useId, useRef, useState } from "react";
+import Link from "next/link";
+import { Fragment, useState } from "react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
 import { CloudDashboard } from "./components/cloud-dashboard";
 import { Sidebar } from "./components/sidebar";
@@ -427,6 +428,9 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
         <div className="min-w-0">
           <h3 className="break-words text-xl font-bold">{deal.brand}</h3>
           {deal.category && <p className="mt-1 text-sm text-[#53668e]">{deal.category}</p>}
+          <Link href={`/invoices/new?dealId=${deal.id}`} onClick={(event) => event.stopPropagation()} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
+            + Create Invoice
+          </Link>
         </div>
         <dl className="grid grid-cols-2 gap-3 sm:flex-1 lg:max-w-2xl lg:grid-cols-4">
           {[{ label: "Deal Date", value: formatDate(deal.dealDate) }, { label: "Content Due", value: formatDate(deal.dueDate) }, { label: "Amount", value: formatMoney(deal.amount) }].map(item => (
@@ -542,22 +546,22 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
 }
 
 function DealActions({ deal, onEdit, onDelete, disabled }: { deal: Deal; onEdit: () => void; onDelete: () => void; disabled: boolean }) {
-  const popover = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const id = `actions-${deal.id}`;
   return (
     <>
       <button
         type="button"
         aria-label={`Actions for ${deal.brand}`}
+        aria-expanded={open}
         disabled={disabled}
-        popoverTarget={id}
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           setPosition({
             top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 108)),
             left: Math.max(8, Math.min(rect.right - 128, window.innerWidth - 136)),
           });
+          setOpen(current => !current);
         }}
         className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[#405579] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
       >
@@ -565,36 +569,35 @@ function DealActions({ deal, onEdit, onDelete, disabled }: { deal: Deal; onEdit:
           <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
         </svg>
       </button>
-      <div
-        ref={popover}
-        id={id}
-        popover="auto"
-        aria-label={`Actions for ${deal.brand}`}
-        style={position}
-        className="fixed m-0 w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
-      >
-        <button type="button" onClick={() => { popover.current?.hidePopover(); onEdit(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-[#101c40] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
-          Edit
-        </button>
-        <button type="button" onClick={() => { popover.current?.hidePopover(); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
-          Delete
-        </button>
-      </div>
+      {open && <>
+        <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default" />
+        <div
+          aria-label={`Actions for ${deal.brand}`}
+          style={position}
+          className="fixed z-50 m-0 w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+        >
+          <button type="button" onClick={() => { setOpen(false); onEdit(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-[#101c40] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
+            Edit
+          </button>
+          <button type="button" onClick={() => { setOpen(false); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
+            Delete
+          </button>
+        </div>
+      </>}
     </>
   );
 }
 
 function NoteActions({ onDelete, disabled }: { onDelete: () => void; disabled: boolean }) {
-  const popover = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const id = useId();
   return (
     <>
       <button
         type="button"
         aria-label="Note actions"
+        aria-expanded={open}
         disabled={disabled}
-        popoverTarget={id}
         onClick={(event) => {
           event.stopPropagation();
           const rect = event.currentTarget.getBoundingClientRect();
@@ -602,6 +605,7 @@ function NoteActions({ onDelete, disabled }: { onDelete: () => void; disabled: b
             top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 68)),
             left: Math.max(8, Math.min(rect.right - 112, window.innerWidth - 120)),
           });
+          setOpen(current => !current);
         }}
         className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#405579] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
       >
@@ -609,18 +613,18 @@ function NoteActions({ onDelete, disabled }: { onDelete: () => void; disabled: b
           <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
         </svg>
       </button>
-      <div
-        ref={popover}
-        id={id}
-        popover="auto"
-        aria-label="Note actions"
-        style={position}
-        className="fixed m-0 w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
-      >
-        <button type="button" onClick={(event) => { event.stopPropagation(); popover.current?.hidePopover(); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
-          Delete
-        </button>
-      </div>
+      {open && <>
+        <button type="button" aria-label="Close menu" onClick={(event) => { event.stopPropagation(); setOpen(false); }} className="fixed inset-0 z-40 cursor-default" />
+        <div
+          aria-label="Note actions"
+          style={position}
+          className="fixed z-50 m-0 w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+        >
+          <button type="button" onClick={(event) => { event.stopPropagation(); setOpen(false); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
+            Delete
+          </button>
+        </div>
+      </>}
     </>
   );
 }

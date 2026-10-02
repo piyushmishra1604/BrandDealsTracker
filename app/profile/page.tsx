@@ -1,0 +1,145 @@
+"use client";
+
+import { useState } from "react";
+import { type BankAccount, type Profile } from "@/lib/profile";
+import { CloudProfile } from "../components/cloud-profile";
+import { Sidebar } from "../components/sidebar";
+
+export default function ProfilePage() {
+  return <CloudProfile>{(profile, saveProfile) => (
+    <ProfileForm profile={profile} saveProfile={saveProfile} />
+  )}</CloudProfile>;
+}
+
+function ProfileForm({ profile, saveProfile }: {
+  profile: Profile;
+  saveProfile: (profile: Profile) => Promise<string | null>;
+}) {
+  const [draft, setDraft] = useState<Profile>(profile);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const inputClass = "mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600";
+
+  function updateAccount(id: string, patch: Partial<BankAccount>) {
+    setDraft(current => ({ ...current, bankAccounts: current.bankAccounts.map(account => account.id === id ? { ...account, ...patch } : account) }));
+  }
+
+  async function handleSave() {
+    const cleaned: Profile = {
+      ...draft,
+      senderName: draft.senderName.trim(),
+      senderEmail: draft.senderEmail?.trim(),
+      senderAddress: draft.senderAddress?.trim(),
+      bankAccounts: draft.bankAccounts
+        .map(account => ({
+          ...account,
+          label: account.label.trim(),
+          bankName: account.bankName?.trim(),
+          accountHolder: account.accountHolder?.trim(),
+          accountNumber: account.accountNumber?.trim(),
+          ifscOrSwift: account.ifscOrSwift?.trim(),
+          upiId: account.upiId?.trim(),
+        }))
+        .filter(account => account.label),
+    };
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const saveError = await saveProfile(cleaned);
+      if (saveError) setError(saveError);
+      else { setDraft(cleaned); setNotice("Profile saved."); }
+    } catch { setError("Could not save your profile. Please try again."); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f0f4f9] p-2 text-[#101c40] sm:p-4">
+      <a href="#profile-form" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3">Skip to Profile</a>
+      <div className="mx-auto flex min-h-[calc(100dvh-2rem)] max-w-[1600px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_32px_#20345c08] md:flex-row">
+        <Sidebar />
+        <main id="profile-form" className="min-w-0 flex-1 px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
+
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Profile</h1>
+          <p className="mt-1.5 text-sm text-[#53668e] sm:text-base">Your details and bank accounts, used to prefill new invoices.</p>
+        </div>
+
+        <div className="max-w-2xl space-y-6">
+          <fieldset className="rounded-xl border border-[#e5ebf5] p-5">
+            <legend className="px-1 text-base font-bold">Your Details</legend>
+            <p className="mb-4 text-xs text-[#53668e]">Shown as the &ldquo;From&rdquo; details on every invoice.</p>
+            <div className="grid gap-4">
+              <label className="text-xs text-[#405579]">Name / Business Name
+                <input maxLength={120} value={draft.senderName} onChange={(event) => setDraft(current => ({ ...current, senderName: event.target.value }))} className={inputClass} />
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-xs text-[#405579]">Email
+                  <input type="email" maxLength={254} value={draft.senderEmail ?? ""} onChange={(event) => setDraft(current => ({ ...current, senderEmail: event.target.value }))} className={inputClass} />
+                </label>
+                <label className="text-xs text-[#405579]">Address
+                  <textarea rows={2} maxLength={300} value={draft.senderAddress ?? ""} onChange={(event) => setDraft(current => ({ ...current, senderAddress: event.target.value }))} className={inputClass} />
+                </label>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset className="rounded-xl border border-[#e5ebf5] p-5">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <legend className="px-1 text-base font-bold">Bank Accounts</legend>
+                <p className="text-xs text-[#53668e]">Add one or more accounts to choose from when creating an invoice.</p>
+              </div>
+              <button type="button" disabled={draft.bankAccounts.length >= 20} onClick={() => setDraft(current => ({ ...current, bankAccounts: [...current.bankAccounts, { id: crypto.randomUUID(), label: "", bankName: "", accountHolder: "", accountNumber: "", ifscOrSwift: "", upiId: "" }] }))} className="shrink-0 cursor-pointer rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-600 disabled:opacity-50">
+                + Add Account
+              </button>
+            </div>
+            {draft.bankAccounts.length === 0 && <p className="text-sm text-[#53668e]">No bank accounts added yet.</p>}
+            <div className="space-y-4">
+              {draft.bankAccounts.map((account, index) => (
+                <div key={account.id} className="rounded-lg border border-[#edf1f8] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <label className="flex-1 text-xs text-[#405579]">Label
+                      <input aria-label={`Account ${index + 1} label`} required maxLength={60} placeholder="e.g. HDFC Primary" value={account.label} onChange={(event) => updateAccount(account.id, { label: event.target.value })} className={inputClass} />
+                    </label>
+                    <button type="button" aria-label={`Remove account ${index + 1}`} onClick={() => setDraft(current => ({ ...current, bankAccounts: current.bankAccounts.filter(entry => entry.id !== account.id) }))} className="mt-4 cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">
+                      Remove
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-xs text-[#405579]">Bank Name
+                      <input aria-label={`Account ${index + 1} bank name`} maxLength={120} value={account.bankName ?? ""} onChange={(event) => updateAccount(account.id, { bankName: event.target.value })} className={inputClass} />
+                    </label>
+                    <label className="text-xs text-[#405579]">Account Holder Name
+                      <input aria-label={`Account ${index + 1} account holder`} maxLength={120} value={account.accountHolder ?? ""} onChange={(event) => updateAccount(account.id, { accountHolder: event.target.value })} className={inputClass} />
+                    </label>
+                    <label className="text-xs text-[#405579]">Account Number
+                      <input aria-label={`Account ${index + 1} account number`} maxLength={120} value={account.accountNumber ?? ""} onChange={(event) => updateAccount(account.id, { accountNumber: event.target.value })} className={inputClass} />
+                    </label>
+                    <label className="text-xs text-[#405579]">IFSC / SWIFT Code
+                      <input aria-label={`Account ${index + 1} IFSC or SWIFT`} maxLength={120} value={account.ifscOrSwift ?? ""} onChange={(event) => updateAccount(account.id, { ifscOrSwift: event.target.value })} className={inputClass} />
+                    </label>
+                    <label className="text-xs text-[#405579]">UPI ID
+                      <input aria-label={`Account ${index + 1} UPI ID`} maxLength={120} value={account.upiId ?? ""} onChange={(event) => updateAccount(account.id, { upiId: event.target.value })} className={inputClass} />
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </fieldset>
+
+          {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+          <div className="flex items-center gap-3">
+            <button type="button" disabled={saving} onClick={() => void handleSave()} className="cursor-pointer rounded-lg bg-[#243657] px-5 py-3 text-sm font-semibold text-white hover:bg-[#172846] disabled:opacity-50">
+              {saving ? "Saving…" : "Save Profile"}
+            </button>
+            <p role="status" className="text-sm text-[#53668e]">{notice}</p>
+          </div>
+        </div>
+        </main>
+      </div>
+    </div>
+  );
+}
