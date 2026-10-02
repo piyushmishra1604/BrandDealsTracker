@@ -103,9 +103,19 @@ function InvoiceList({ invoices, removeInvoice }: { invoices: Invoice[]; removeI
                     <td className="whitespace-nowrap px-5 py-4">{formatDate(invoice.dueDate)}</td>
                     <td className="whitespace-nowrap px-5 py-4 tabular-nums">{formatAmount(invoiceTotal(invoice), invoice.currency)}</td>
                     <td className="whitespace-nowrap px-3 py-2">
-                      <button type="button" disabled={deletingId !== null} onClick={() => void deleteInvoice(invoice)} className="cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">
-                        {deletingId === invoice.id ? "Deleting…" : "Delete"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {invoice.pdfUrl && <>
+                          <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer" className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
+                            View Invoice<span className="sr-only"> (opens in a new tab)</span>
+                          </a>
+                          <a href={`${invoice.pdfUrl}?download=${invoice.invoiceNumber}.pdf`} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
+                            Download PDF
+                          </a>
+                        </>}
+                        <button type="button" disabled={deletingId !== null} onClick={() => void deleteInvoice(invoice)} className="cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">
+                          {deletingId === invoice.id ? "Deleting…" : "Delete"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

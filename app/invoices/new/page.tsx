@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { pdf } from "@react-pdf/renderer";
 import { Suspense, useState } from "react";
 import { type Deal, todayDate } from "@/lib/deals";
+import { InvoicePdfDocument } from "@/lib/invoice-pdf";
 import { type CurrencyCode, type Invoice, type InvoiceItem, currencies, currencySymbols, invoiceDateError, invoiceTotal, isInvoice, nextInvoiceNumber } from "@/lib/invoices";
 import { type Profile } from "@/lib/profile";
+import { getSupabase } from "@/lib/supabase/client";
 import { CloudDashboard } from "../../components/cloud-dashboard";
 import { CloudInvoices } from "../../components/cloud-invoices";
 import { CloudProfile } from "../../components/cloud-profile";
@@ -65,9 +68,11 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
       id: crypto.randomUUID(),
       invoiceNumber: nextInvoiceNumber(invoices),
       brand: prefillDeal?.brand ?? brands[0] ?? "",
+      billToAddress: prefillDeal?.billingAddress ?? "",
       issueDate,
       dueDate: addDays(issueDate, 14),
       currency: "INR",
+      senderBrandName: profile.brandName ?? "",
       senderName: profile.senderName,
       senderEmail: profile.senderEmail ?? "",
       senderAddress: profile.senderAddress ?? "",
@@ -90,6 +95,11 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
     setInvoice(current => ({ ...current, items: current.items.map((item, i) => i === index ? { ...item, ...patch } : item) }));
   }
 
+  function selectBrand(brand: string) {
+    const matchingDeal = deals.find(deal => deal.brand === brand && deal.billingAddress);
+    setInvoice(current => ({ ...current, brand, billToAddress: matchingDeal?.billingAddress ?? current.billToAddress }));
+  }
+
   function selectBankAccount(accountId: string) {
     setSelectedAccountId(accountId);
     const account = profile.bankAccounts.find(entry => entry.id === accountId);
@@ -107,6 +117,8 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
     const cleaned: Invoice = {
       ...invoice,
       brand: invoice.brand.trim(),
+      billToAddress: invoice.billToAddress?.trim(),
+      senderBrandName: invoice.senderBrandName?.trim(),
       senderName: invoice.senderName.trim(),
       senderEmail: invoice.senderEmail?.trim(),
       senderAddress: invoice.senderAddress?.trim(),
@@ -127,7 +139,15 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
     setSaving(true);
     setError("");
     try {
-      const saveError = await saveInvoice(cleaned);
+      // Store a PDF snapshot in Supabase Storage so the invoice can be viewed later from the deal.
+      let pdfUrl = cleaned.pdfUrl ?? "";
+      try {
+        const blob = await pdf(<InvoicePdfDocument invoice={cleaned} />).toBlob();
+        const path = `${cleaned.id}.pdf`;
+        const { error: uploadError } = await getSupabase().storage.from("invoice-pdfs").upload(path, blob, { upsert: true, contentType: "application/pdf" });
+        if (!uploadError) pdfUrl = getSupabase().storage.from("invoice-pdfs").getPublicUrl(path).data.publicUrl;
+      } catch { /* Save the invoice even if the PDF snapshot fails to generate or upload. */ }
+      const saveError = await saveInvoice({ ...cleaned, pdfUrl });
       if (saveError) setError(saveError);
       else router.push("/invoices");
     } catch { setError("Could not save the invoice. Please try again."); }
@@ -158,7 +178,7 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
               <p className="mb-4 text-xs text-[#53668e]">Add the basic information for this invoice.</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-xs text-[#405579]">Brand
-                  <select required value={invoice.brand} onChange={(event) => setInvoice(current => ({ ...current, brand: event.target.value }))} className={inputClass}>
+                  <select required value={invoice.brand} onChange={(event) => selectBrand(event.target.value)} className={inputClass}>
                     <option value="" disabled>Select a brand</option>
                     {brands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
                   </select>
@@ -181,9 +201,21 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
             </fieldset>
 
             <fieldset className="rounded-xl border border-[#e5ebf5] p-5">
+              <legend className="px-1 text-base font-bold">Bill To</legend>
+              <p className="mb-4 text-xs text-[#53668e]">Paste the brand&apos;s registered name, GSTIN, and address (optional).</p>
+              <label className="text-xs text-[#405579]">Billing Address
+                <textarea rows={5} maxLength={1000} value={invoice.billToAddress ?? ""} onChange={(event) => setInvoice(current => ({ ...current, billToAddress: event.target.value }))} placeholder={"Registered company name\nGSTIN: ...\n\nAddress line 1\nAddress line 2\nCity, State PIN"} className={`${inputClass} font-mono`} />
+              </label>
+            </fieldset>
+
+            <fieldset className="rounded-xl border border-[#e5ebf5] p-5">
               <legend className="px-1 text-base font-bold">Your Details</legend>
               <p className="mb-4 text-xs text-[#53668e]">Your information will appear on the invoice.</p>
               <div className="grid gap-4">
+                <label className="text-xs text-[#405579]">Brand Name
+                  <input maxLength={120} placeholder="e.g. Ball Lifestyle" value={invoice.senderBrandName ?? ""} onChange={(event) => setInvoice(current => ({ ...current, senderBrandName: event.target.value }))} className={inputClass} />
+                  <span className="mt-1 block text-[#53668e]">Shown prominently at the top of the invoice.</span>
+                </label>
                 <label className="text-xs text-[#405579]">Name / Business Name
                   <input required maxLength={120} value={invoice.senderName} onChange={(event) => setInvoice(current => ({ ...current, senderName: event.target.value }))} className={inputClass} />
                 </label>
@@ -282,11 +314,7 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
 
             <div className="rounded-xl border border-[#edf1f8] p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="font-bold">{invoice.senderName || "Your Name"}</p>
-                  {invoice.senderAddress && <p className="whitespace-pre-line text-sm text-[#53668e]">{invoice.senderAddress}</p>}
-                  {invoice.senderEmail && <p className="text-sm text-[#53668e]">{invoice.senderEmail}</p>}
-                </div>
+                <p className="text-2xl font-bold tracking-tight">{invoice.senderBrandName || "Your Brand"}</p>
                 <div className="text-right">
                   <p className="text-xl font-bold tracking-tight">INVOICE</p>
                   <p className="text-sm text-[#53668e]"># {invoice.invoiceNumber}</p>
@@ -297,6 +325,7 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
                 <div>
                   <p className="text-xs font-medium text-[#53668e]">Bill To</p>
                   <p className="font-bold">{invoice.brand || "Brand"}</p>
+                  {invoice.billToAddress && <p className="mt-1 whitespace-pre-line text-sm text-[#53668e]">{invoice.billToAddress}</p>}
                 </div>
                 <dl className="space-y-1 text-sm">
                   <div className="flex gap-6"><dt className="text-[#53668e]">Issue Date</dt><dd className="min-w-24 text-right">{formatDate(invoice.issueDate)}</dd></div>
@@ -341,6 +370,13 @@ function InvoiceForm({ deals, invoices, saveInvoice, profile }: {
                   {invoice.upiId && <div className="flex gap-2"><dt>UPI ID:</dt><dd>{invoice.upiId}</dd></div>}
                 </dl>
               </div>}
+
+              <div className="mt-6 border-t border-[#edf1f8] pt-4 text-sm">
+                <p className="font-bold">From</p>
+                <p className="mt-1">{invoice.senderName || "Your Name"}</p>
+                {invoice.senderAddress && <p className="whitespace-pre-line text-[#53668e]">{invoice.senderAddress}</p>}
+                {invoice.senderEmail && <p className="text-[#53668e]">{invoice.senderEmail}</p>}
+              </div>
 
               {invoice.notes && <div className="mt-6 border-t border-[#edf1f8] pt-4 text-sm">
                 <p className="font-bold">Notes</p>

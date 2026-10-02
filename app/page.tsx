@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { Fragment, useState } from "react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
+import { type Invoice, currencySymbols, invoiceTotal } from "@/lib/invoices";
 import { CloudDashboard } from "./components/cloud-dashboard";
+import { CloudInvoices } from "./components/cloud-invoices";
 import { Sidebar } from "./components/sidebar";
 
 const formatMoney = (amount: number) =>
@@ -21,10 +23,14 @@ const formatMonth = (month: string, style: "short" | "long") =>
   }).format(new Date(`${month}-01T00:00:00Z`));
 
 export default function Home() {
-  return <CloudDashboard>{(deals, persistDeal, removeDeal) => <Dashboard deals={deals} persistDeal={persistDeal} removeDeal={removeDeal} />}</CloudDashboard>;
+  return <CloudDashboard>{(deals, persistDeal, removeDeal) => (
+    <CloudInvoices>{(invoices) => (
+      <Dashboard deals={deals} persistDeal={persistDeal} removeDeal={removeDeal} invoices={invoices} />
+    )}</CloudInvoices>
+  )}</CloudDashboard>;
 }
 
-function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistDeal: (deal: Deal) => Promise<string | null>; removeDeal: (id: string) => Promise<string | null> }) {
+function Dashboard({ deals, persistDeal, removeDeal, invoices }: { deals: Deal[]; persistDeal: (deal: Deal) => Promise<string | null>; removeDeal: (id: string) => Promise<string | null>; invoices: Invoice[] }) {
   const [notice, setNotice] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   async function deleteDeal(deal: Deal) {
@@ -257,7 +263,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
                     </tr>
                     <tr id={`deliverables-${deal.id}`} hidden={detailsId !== deal.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
                       <td colSpan={6} className="px-6 py-5">
-                        <DealDetails deal={deal} onSave={persistDeal} />
+                        <DealDetails deal={deal} onSave={persistDeal} invoices={invoices} />
                       </td>
                     </tr>
                     <tr id={`details-${deal.id}`} hidden={expandedDeal !== deal.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
@@ -308,7 +314,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
                   </div>
                 </div>
                 <div id={`deliverables-${deal.id}`} hidden={detailsId !== deal.id} className="bg-[#f8faff] px-5 py-5">
-                  <DealDetails deal={deal} onSave={persistDeal} />
+                  <DealDetails deal={deal} onSave={persistDeal} invoices={invoices} />
                 </div>
                 <div id={`details-${deal.id}`} hidden={expandedDeal !== deal.id} className="bg-[#f8faff] px-5 py-4">
                   {expandedDeal === deal.id && <DealEditor deal={deal} onSave={saveDeal} onCancel={() => setExpandedDeal(null)} />}
@@ -337,7 +343,7 @@ function Dashboard({ deals, persistDeal, removeDeal }: { deals: Deal[]; persistD
   );
 }
 
-function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Promise<string | null> }) {
+function DealDetails({ deal, onSave, invoices }: { deal: Deal; onSave: (deal: Deal) => Promise<string | null>; invoices: Invoice[] }) {
   const [copyNotice, setCopyNotice] = useState("");
   const [newNote, setNewNote] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
@@ -345,6 +351,11 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
   const [notesError, setNotesError] = useState("");
   const [togglingDeliverable, setTogglingDeliverable] = useState<number | null>(null);
   const [deliverablesError, setDeliverablesError] = useState("");
+  const [editingDeliverables, setEditingDeliverables] = useState(false);
+  const [removingDeliverable, setRemovingDeliverable] = useState<number | null>(null);
+  const [addingDeliverable, setAddingDeliverable] = useState(false);
+  const [newDeliverableType, setNewDeliverableType] = useState<Deliverable["type"]>("Reel");
+  const [newDeliverableQuantity, setNewDeliverableQuantity] = useState(1);
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusError, setStatusError] = useState("");
   const noteLines = (deal.notes ?? "").split("\n").filter(line => line.trim());
@@ -392,6 +403,30 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
     } catch { setDeliverablesError("Could not update the deliverable. Please try again."); }
     finally { setTogglingDeliverable(null); }
   }
+  async function addDeliverable() {
+    if (!Number.isInteger(newDeliverableQuantity) || newDeliverableQuantity < 1 || newDeliverableQuantity > 999) {
+      setDeliverablesError("Enter a whole-number quantity from 1 to 999."); return;
+    }
+    setAddingDeliverable(true);
+    setDeliverablesError("");
+    try {
+      const updatedDeliverables = [...(deal.deliverables ?? []), { type: newDeliverableType, quantity: newDeliverableQuantity }];
+      const error = await onSave({ ...deal, deliverables: updatedDeliverables });
+      if (error) setDeliverablesError(error);
+      else { setNewDeliverableType("Reel"); setNewDeliverableQuantity(1); }
+    } catch { setDeliverablesError("Could not add the deliverable. Please try again."); }
+    finally { setAddingDeliverable(false); }
+  }
+  async function removeDeliverable(index: number) {
+    setRemovingDeliverable(index);
+    setDeliverablesError("");
+    try {
+      const updatedDeliverables = (deal.deliverables ?? []).filter((_, i) => i !== index);
+      const error = await onSave({ ...deal, deliverables: updatedDeliverables });
+      if (error) setDeliverablesError(error);
+    } catch { setDeliverablesError("Could not remove the deliverable. Please try again."); }
+    finally { setRemovingDeliverable(null); }
+  }
   const [editingContact, setEditingContact] = useState(false);
   const [contactName, setContactName] = useState(deal.contactName ?? "");
   const [contactEmail, setContactEmail] = useState(deal.contactEmail ?? "");
@@ -422,15 +457,13 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
   const phone = deal.contactPhone && /^\+[1-9]\d{6,14}$/.test(deal.contactPhone) ? deal.contactPhone.slice(1) : null;
   const contact = [deal.contactName, deal.contactEmail, deal.contactPhone].filter(Boolean).join("\n");
   const labels = { Reel: "Instagram Reel", Story: "Instagram Stories", Post: "Instagram Post", "Ad Rights": "Ad rights", Other: "Other deliverable" };
+  const dealInvoices = invoices.filter(invoice => invoice.brand === deal.brand).sort((a, b) => b.issueDate.localeCompare(a.issueDate));
   return (
     <div className="rounded-xl border border-[#e9e6f5] bg-gradient-to-br from-[#fff7fa] to-[#f1f6ff] p-4 sm:p-5">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h3 className="break-words text-xl font-bold">{deal.brand}</h3>
           {deal.category && <p className="mt-1 text-sm text-[#53668e]">{deal.category}</p>}
-          <Link href={`/invoices/new?dealId=${deal.id}`} onClick={(event) => event.stopPropagation()} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
-            + Create Invoice
-          </Link>
         </div>
         <dl className="grid grid-cols-2 gap-3 sm:flex-1 lg:max-w-2xl lg:grid-cols-4">
           {[{ label: "Deal Date", value: formatDate(deal.dealDate) }, { label: "Content Due", value: formatDate(deal.dueDate) }, { label: "Amount", value: formatMoney(deal.amount) }].map(item => (
@@ -455,8 +488,14 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
         {statusError && <p role="alert" className="mt-2 w-full text-xs text-red-700">{statusError}</p>}
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <div className="space-y-4">
         <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
-          <h4 className="mb-3 font-semibold">Deliverables</h4>
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="font-semibold">Deliverables</h4>
+            <button type="button" onClick={(event) => { event.stopPropagation(); setEditingDeliverables(current => !current); }} className="cursor-pointer text-xs font-medium text-blue-600 hover:underline">
+              {editingDeliverables ? "Done" : "Edit"}
+            </button>
+          </div>
           {deal.deliverables?.length ? <ul className="space-y-2">
             {deal.deliverables.map((item, index) => <li key={index} className={`flex items-center gap-3 rounded-lg px-3 py-3 ${index % 2 ? "bg-[#f0f5ff]" : "bg-[#fcf0fa]"}`}>
               <input
@@ -470,10 +509,56 @@ function DealDetails({ deal, onSave }: { deal: Deal; onSave: (deal: Deal) => Pro
               />
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-5 w-5 shrink-0 text-violet-600"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".7" /></svg>
               <span className="text-sm">{labels[item.type]}</span><span className="ml-auto whitespace-nowrap text-sm font-semibold">{item.type === "Ad Rights" ? `${item.quantity} month${item.quantity === 1 ? "" : "s"}` : `${item.quantity} ×`}</span>
+              {editingDeliverables && <button type="button" aria-label={`Remove ${labels[item.type]}`} disabled={removingDeliverable !== null} onClick={(event) => { event.stopPropagation(); void removeDeliverable(index); }} className="shrink-0 cursor-pointer rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50">
+                {removingDeliverable === index ? "…" : "Remove"}
+              </button>}
             </li>)}
           </ul> : <p className="py-4 text-sm text-[#53668e]">No deliverables added yet.</p>}
+          {editingDeliverables && <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-[#edf1f8] pt-3" onClick={(event) => event.stopPropagation()}>
+            <label className="text-xs text-[#405579]">Type
+              <select aria-label="New deliverable type" value={newDeliverableType} onChange={(event) => setNewDeliverableType(event.target.value as Deliverable["type"])} className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600">
+                {["Reel", "Story", "Post", "Ad Rights", "Other"].map(type => <option key={type}>{type}</option>)}
+              </select>
+            </label>
+            <label className="w-24 text-xs text-[#405579]">{newDeliverableType === "Ad Rights" ? "Months" : "Quantity"}
+              <input aria-label="New deliverable quantity" type="number" min="1" max="999" step="1" value={Number.isNaN(newDeliverableQuantity) ? "" : newDeliverableQuantity} onChange={(event) => setNewDeliverableQuantity(event.target.valueAsNumber)} className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600" />
+            </label>
+            <button type="button" disabled={addingDeliverable || (deal.deliverables?.length ?? 0) >= 50} onClick={() => void addDeliverable()} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-2 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">
+              {addingDeliverable ? "Adding…" : "+ Add deliverable"}
+            </button>
+          </div>}
           {deliverablesError && <p role="alert" className="mt-2 text-xs text-red-700">{deliverablesError}</p>}
         </section>
+        <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="font-semibold">Invoices</h4>
+            <Link href={`/invoices/new?dealId=${deal.id}`} onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+              Create Invoice
+            </Link>
+          </div>
+          {dealInvoices.length ? <ul className="space-y-2">
+            {dealInvoices.map(invoice => (
+              <li key={invoice.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#f5f7fb] px-3 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{invoice.invoiceNumber}</p>
+                  <p className="text-xs text-[#53668e]">{formatDate(invoice.issueDate)}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="whitespace-nowrap text-sm font-semibold tabular-nums">{currencySymbols[invoice.currency]}{new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(invoiceTotal(invoice))}</span>
+                  {invoice.pdfUrl && <>
+                    <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
+                      View Invoice<span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                    <a href={`${invoice.pdfUrl}?download=${invoice.invoiceNumber}.pdf`} onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
+                      Download PDF
+                    </a>
+                  </>}
+                </div>
+              </li>
+            ))}
+          </ul> : <p className="py-4 text-sm text-[#53668e]">No invoices created yet.</p>}
+        </section>
+        </div>
         <div className="space-y-4">
           <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
             <h4 className="mb-2 font-semibold">Notes</h4>

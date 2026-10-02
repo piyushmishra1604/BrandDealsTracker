@@ -21,6 +21,7 @@ export function isBankAccounts(value: unknown): value is BankAccount[] {
 
 export type Profile = {
   id: string;
+  brandName?: string;
   senderName: string;
   senderEmail?: string;
   senderAddress?: string;
@@ -33,6 +34,7 @@ export function isProfile(value: unknown): value is Profile {
   if (!value || typeof value !== "object") return false;
   const profile = value as Profile;
   return typeof profile.id === "string" && !!profile.id
+    && (profile.brandName === undefined || (typeof profile.brandName === "string" && profile.brandName.length <= 120))
     && typeof profile.senderName === "string" && profile.senderName.length <= 120
     && (profile.senderEmail === undefined || (typeof profile.senderEmail === "string" && profile.senderEmail.length <= 254))
     && (profile.senderAddress === undefined || (typeof profile.senderAddress === "string" && profile.senderAddress.length <= 300))

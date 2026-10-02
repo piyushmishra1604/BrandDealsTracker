@@ -29,9 +29,11 @@ export type Invoice = {
   id: string;
   invoiceNumber: string;
   brand: string;
+  billToAddress?: string;
   issueDate: string;
   dueDate: string;
   currency: CurrencyCode;
+  senderBrandName?: string;
   senderName: string;
   senderEmail?: string;
   senderAddress?: string;
@@ -42,6 +44,7 @@ export type Invoice = {
   accountNumber?: string;
   ifscOrSwift?: string;
   upiId?: string;
+  pdfUrl?: string;
   // Set by the database trigger on every save; shown as the "Last Update" column.
   updated_at?: string;
 };
@@ -56,15 +59,18 @@ export function isInvoice(value: unknown): value is Invoice {
   return typeof invoice.id === "string" && !!invoice.id
     && typeof invoice.invoiceNumber === "string" && !!invoice.invoiceNumber.trim() && invoice.invoiceNumber.length <= 40
     && typeof invoice.brand === "string" && !!invoice.brand.trim() && invoice.brand.length <= 120
+    && (invoice.billToAddress === undefined || (typeof invoice.billToAddress === "string" && invoice.billToAddress.length <= 1000))
     && isDate(invoice.issueDate) && isDate(invoice.dueDate)
     && currencies.some(entry => entry.code === invoice.currency)
+    && (invoice.senderBrandName === undefined || (typeof invoice.senderBrandName === "string" && invoice.senderBrandName.length <= 120))
     && typeof invoice.senderName === "string" && !!invoice.senderName.trim() && invoice.senderName.length <= 120
     && (invoice.senderEmail === undefined || (typeof invoice.senderEmail === "string" && invoice.senderEmail.length <= 254))
     && (invoice.senderAddress === undefined || (typeof invoice.senderAddress === "string" && invoice.senderAddress.length <= 300))
     && isInvoiceItems(invoice.items)
     && (invoice.notes === undefined || (typeof invoice.notes === "string" && invoice.notes.length <= 5000))
     && (["bankName", "accountHolder", "accountNumber", "ifscOrSwift", "upiId"] as const).every(key =>
-      invoice[key] === undefined || (typeof invoice[key] === "string" && invoice[key].length <= 120));
+      invoice[key] === undefined || (typeof invoice[key] === "string" && invoice[key].length <= 120))
+    && (invoice.pdfUrl === undefined || (typeof invoice.pdfUrl === "string" && invoice.pdfUrl.length <= 2048));
 }
 
 export function invoiceDateError(invoice: Pick<Invoice, "issueDate" | "dueDate">) {

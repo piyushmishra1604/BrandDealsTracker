@@ -29,6 +29,7 @@ function ProfileForm({ profile, saveProfile }: {
   async function handleSave() {
     const cleaned: Profile = {
       ...draft,
+      brandName: draft.brandName?.trim(),
       senderName: draft.senderName.trim(),
       senderEmail: draft.senderEmail?.trim(),
       senderAddress: draft.senderAddress?.trim(),
@@ -72,6 +73,10 @@ function ProfileForm({ profile, saveProfile }: {
             <legend className="px-1 text-base font-bold">Your Details</legend>
             <p className="mb-4 text-xs text-[#53668e]">Shown as the &ldquo;From&rdquo; details on every invoice.</p>
             <div className="grid gap-4">
+              <label className="text-xs text-[#405579]">Brand Name
+                <input maxLength={120} placeholder="e.g. Ball Lifestyle" value={draft.brandName ?? ""} onChange={(event) => setDraft(current => ({ ...current, brandName: event.target.value }))} className={inputClass} />
+                <span className="mt-1 block text-[#53668e]">Shown prominently at the top of every invoice.</span>
+              </label>
               <label className="text-xs text-[#405579]">Name / Business Name
                 <input maxLength={120} value={draft.senderName} onChange={(event) => setDraft(current => ({ ...current, senderName: event.target.value }))} className={inputClass} />
               </label>

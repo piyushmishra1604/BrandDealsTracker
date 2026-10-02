@@ -6,9 +6,6 @@ import { usePathname } from "next/navigation";
 const navigation = [
   { label: "Dashboard", href: "/", path: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9" },
   { label: "Brand Outreach", href: "/outreach", path: "M3 6h18v12H3V6Zm0 0 9 7 9-7" },
-  { label: "Deals", href: null, path: "M3 3h8l10 10-8 8L3 11V3Zm4 4h.01" },
-  { label: "Calendar", href: null, path: "M8 2v5M16 2v5M3 10h18M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2Z" },
-  { label: "Analytics", href: null, path: "M3 21h18M5 21V11h3v10M11 21V4h3v17M17 21V8h3v13" },
   { label: "Invoices", href: "/invoices", path: "M7 3h8l4 4v14H7V3Zm8 0v4h4M9 12h6M9 16h6M9 8h2" },
   { label: "Profile", href: "/profile", path: "M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 0c-4.5 0-8 2.5-8 6v1h16v-1c0-3.5-3.5-6-8-6Z" },
   { label: "Settings", href: null, path: "m9 3-1 3-3 1-2 4 2 2v4l4 3 3-1 3 1 4-3v-4l2-2-2-4-3-1-1-3H9Zm6 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },

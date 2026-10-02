@@ -22,6 +22,7 @@ export type Deal = {
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  billingAddress?: string;
   dealDate: string;
   amount: number;
   dueDate: string;
@@ -46,6 +47,7 @@ export function isDeal(value: unknown): value is Deal {
     && (deal.instagramUrl == null || isInstagramUrl(deal.instagramUrl))
     && (deal.deliverables === undefined || isDeliverables(deal.deliverables))
     && (deal.notes === undefined || (typeof deal.notes === "string" && deal.notes.length <= 5000))
+    && (deal.billingAddress === undefined || (typeof deal.billingAddress === "string" && deal.billingAddress.length <= 1000))
     && (["category", "contactName", "contactEmail", "contactPhone"] as const).every(key =>
       deal[key] === undefined || (typeof deal[key] === "string" && deal[key].length <= (key === "contactEmail" ? 254 : key === "contactPhone" ? 16 : 120)))
     && typeof deal.contentCreated === "boolean" && typeof deal.sentToBrand === "boolean" && typeof deal.posted === "boolean" && typeof deal.moneyReceived === "boolean";
