@@ -19,11 +19,26 @@ function ProfileForm({ profile, saveProfile }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
 
   const inputClass = "mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600";
 
   function updateAccount(id: string, patch: Partial<BankAccount>) {
     setDraft(current => ({ ...current, bankAccounts: current.bankAccounts.map(account => account.id === id ? { ...account, ...patch } : account) }));
+  }
+
+  function toggleAccount(id: string) {
+    setExpandedAccounts(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function addAccount() {
+    const id = crypto.randomUUID();
+    setDraft(current => ({ ...current, bankAccounts: [...current.bankAccounts, { id, label: "", bankName: "", accountHolder: "", accountNumber: "", ifscOrSwift: "", upiId: "" }] }));
+    setExpandedAccounts(current => new Set(current).add(id));
   }
 
   async function handleSave() {
@@ -97,41 +112,50 @@ function ProfileForm({ profile, saveProfile }: {
                 <legend className="px-1 text-base font-bold">Bank Accounts</legend>
                 <p className="text-xs text-[#53668e]">Add one or more accounts to choose from when creating an invoice.</p>
               </div>
-              <button type="button" disabled={draft.bankAccounts.length >= 20} onClick={() => setDraft(current => ({ ...current, bankAccounts: [...current.bankAccounts, { id: crypto.randomUUID(), label: "", bankName: "", accountHolder: "", accountNumber: "", ifscOrSwift: "", upiId: "" }] }))} className="shrink-0 cursor-pointer rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-600 disabled:opacity-50">
+              <button type="button" disabled={draft.bankAccounts.length >= 20} onClick={addAccount} className="shrink-0 cursor-pointer rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-600 disabled:opacity-50">
                 + Add Account
               </button>
             </div>
             {draft.bankAccounts.length === 0 && <p className="text-sm text-[#53668e]">No bank accounts added yet.</p>}
-            <div className="space-y-4">
-              {draft.bankAccounts.map((account, index) => (
-                <div key={account.id} className="rounded-lg border border-[#edf1f8] p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <label className="flex-1 text-xs text-[#405579]">Label
-                      <input aria-label={`Account ${index + 1} label`} required maxLength={60} placeholder="e.g. HDFC Primary" value={account.label} onChange={(event) => updateAccount(account.id, { label: event.target.value })} className={inputClass} />
-                    </label>
-                    <button type="button" aria-label={`Remove account ${index + 1}`} onClick={() => setDraft(current => ({ ...current, bankAccounts: current.bankAccounts.filter(entry => entry.id !== account.id) }))} className="mt-4 cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">
-                      Remove
-                    </button>
+            <div className="space-y-3">
+              {draft.bankAccounts.map((account, index) => {
+                const isExpanded = expandedAccounts.has(account.id);
+                return (
+                  <div key={account.id} className="overflow-hidden rounded-lg border border-[#edf1f8]">
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <button type="button" aria-expanded={isExpanded} aria-controls={`account-${account.id}`} onClick={() => toggleAccount(account.id)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left">
+                        <span aria-hidden="true" className="shrink-0 text-slate-500">{isExpanded ? "▾" : "▸"}</span>
+                        <span className="truncate text-sm font-medium">{account.label || `Account ${index + 1}`}</span>
+                      </button>
+                      <button type="button" aria-label={`Remove account ${index + 1}`} onClick={() => { if (!window.confirm(`Remove ${account.label || `Account ${index + 1}`}?`)) return; setDraft(current => ({ ...current, bankAccounts: current.bankAccounts.filter(entry => entry.id !== account.id) })); setExpandedAccounts(current => { const next = new Set(current); next.delete(account.id); return next; }); }} className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-sm text-red-600 hover:bg-red-50">
+                        Remove
+                      </button>
+                    </div>
+                    {isExpanded && <div id={`account-${account.id}`} className="border-t border-[#edf1f8] p-4">
+                      <label className="mb-3 block text-xs text-[#405579]">Label
+                        <input aria-label={`Account ${index + 1} label`} required maxLength={60} placeholder="e.g. HDFC Primary" value={account.label} onChange={(event) => updateAccount(account.id, { label: event.target.value })} className={inputClass} />
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="text-xs text-[#405579]">Bank Name
+                          <input aria-label={`Account ${index + 1} bank name`} maxLength={120} value={account.bankName ?? ""} onChange={(event) => updateAccount(account.id, { bankName: event.target.value })} className={inputClass} />
+                        </label>
+                        <label className="text-xs text-[#405579]">Account Holder Name
+                          <input aria-label={`Account ${index + 1} account holder`} maxLength={120} value={account.accountHolder ?? ""} onChange={(event) => updateAccount(account.id, { accountHolder: event.target.value })} className={inputClass} />
+                        </label>
+                        <label className="text-xs text-[#405579]">Account Number
+                          <input aria-label={`Account ${index + 1} account number`} maxLength={120} value={account.accountNumber ?? ""} onChange={(event) => updateAccount(account.id, { accountNumber: event.target.value })} className={inputClass} />
+                        </label>
+                        <label className="text-xs text-[#405579]">IFSC / SWIFT Code
+                          <input aria-label={`Account ${index + 1} IFSC or SWIFT`} maxLength={120} value={account.ifscOrSwift ?? ""} onChange={(event) => updateAccount(account.id, { ifscOrSwift: event.target.value })} className={inputClass} />
+                        </label>
+                        <label className="text-xs text-[#405579]">UPI ID
+                          <input aria-label={`Account ${index + 1} UPI ID`} maxLength={120} value={account.upiId ?? ""} onChange={(event) => updateAccount(account.id, { upiId: event.target.value })} className={inputClass} />
+                        </label>
+                      </div>
+                    </div>}
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs text-[#405579]">Bank Name
-                      <input aria-label={`Account ${index + 1} bank name`} maxLength={120} value={account.bankName ?? ""} onChange={(event) => updateAccount(account.id, { bankName: event.target.value })} className={inputClass} />
-                    </label>
-                    <label className="text-xs text-[#405579]">Account Holder Name
-                      <input aria-label={`Account ${index + 1} account holder`} maxLength={120} value={account.accountHolder ?? ""} onChange={(event) => updateAccount(account.id, { accountHolder: event.target.value })} className={inputClass} />
-                    </label>
-                    <label className="text-xs text-[#405579]">Account Number
-                      <input aria-label={`Account ${index + 1} account number`} maxLength={120} value={account.accountNumber ?? ""} onChange={(event) => updateAccount(account.id, { accountNumber: event.target.value })} className={inputClass} />
-                    </label>
-                    <label className="text-xs text-[#405579]">IFSC / SWIFT Code
-                      <input aria-label={`Account ${index + 1} IFSC or SWIFT`} maxLength={120} value={account.ifscOrSwift ?? ""} onChange={(event) => updateAccount(account.id, { ifscOrSwift: event.target.value })} className={inputClass} />
-                    </label>
-                    <label className="text-xs text-[#405579]">UPI ID
-                      <input aria-label={`Account ${index + 1} UPI ID`} maxLength={120} value={account.upiId ?? ""} onChange={(event) => updateAccount(account.id, { upiId: event.target.value })} className={inputClass} />
-                    </label>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </fieldset>
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { getSupabase } from "@/lib/supabase/client";
 import { type Outreach, isOutreach } from "@/lib/outreach";
 
 export function CloudOutreach({ children }: {
@@ -15,12 +14,13 @@ export function CloudOutreach({ children }: {
     let active = true;
     async function load() {
       try {
-        const { data, error } = await getSupabase().from("outreach").select("*").order("dateReachedOut", { ascending: false });
-        if (error) throw error;
-        if (!data.every(isOutreach)) throw new Error("The saved outreach records have an unexpected format.");
-        if (active) { setOutreach(data); setLoaded(true); setError(""); }
+        const response = await fetch("/api/outreach");
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "Could not load brand outreach.");
+        if (!body.outreach.every(isOutreach)) throw new Error("The saved outreach records have an unexpected format.");
+        if (active) { setOutreach(body.outreach); setLoaded(true); setError(""); }
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Could not load brand outreach. Check that the outreach table has been created in Supabase.");
+        if (active) setError(err instanceof Error ? err.message : "Could not load brand outreach. Check your connection and try again.");
       }
     }
     void load();
@@ -29,21 +29,20 @@ export function CloudOutreach({ children }: {
 
   async function save(item: Outreach) {
     try {
-      const { data, error } = await getSupabase().from("outreach").upsert(item, { onConflict: "id" }).select().single();
-      if (error) return error.message;
-      if (!isOutreach(data)) return "The database returned an unexpected result. Reload before retrying.";
-      setOutreach(current => [...current.filter(entry => entry.id !== data.id), data]);
+      const response = await fetch("/api/outreach", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) });
+      const body = await response.json();
+      if (!response.ok) return body.error ?? "Could not save the record.";
+      if (!isOutreach(body.outreach)) return "The database returned an unexpected result. Reload before retrying.";
+      setOutreach(current => [...current.filter(entry => entry.id !== body.outreach.id), body.outreach]);
       return null;
-    } catch { return "Could not save to Supabase. Check your connection and try again."; }
+    } catch { return "Could not save to the server. Check your connection and try again."; }
   }
 
   async function remove(id: string) {
     try {
-      const { data, error } = await getSupabase().from("outreach").delete().eq("id", id).select("id");
-      if (error) return error.message;
-      if (!data || data.length !== 1 || data[0].id !== id) {
-        return "Deletion was not confirmed. Refresh the page and try again.";
-      }
+      const response = await fetch(`/api/outreach/${id}`, { method: "DELETE" });
+      const body = await response.json();
+      if (!response.ok) return body.error ?? "Could not delete the record.";
       setOutreach(current => current.filter(item => item.id !== id));
       return null;
     } catch { return "Could not delete the record. Check your connection and try again."; }

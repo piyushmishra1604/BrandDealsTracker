@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { Fragment, useState } from "react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
 import { type Invoice, currencySymbols, invoiceTotal } from "@/lib/invoices";
 import { CloudDashboard } from "./components/cloud-dashboard";
 import { CloudInvoices } from "./components/cloud-invoices";
+import { CreateInvoiceButton } from "./components/invoice-modal";
 import { Sidebar } from "./components/sidebar";
 
 const formatMoney = (amount: number) =>
@@ -532,9 +532,9 @@ function DealDetails({ deal, onSave, invoices }: { deal: Deal; onSave: (deal: De
         <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <h4 className="font-semibold">Invoices</h4>
-            <Link href={`/invoices/new?dealId=${deal.id}`} onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+            <CreateInvoiceButton deal={deal} className="cursor-pointer rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
               Create Invoice
-            </Link>
+            </CreateInvoiceButton>
           </div>
           {dealInvoices.length ? <ul className="space-y-2">
             {dealInvoices.map(invoice => (

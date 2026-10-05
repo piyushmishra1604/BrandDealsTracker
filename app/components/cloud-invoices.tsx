@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { getSupabase } from "@/lib/supabase/client";
 import { type Invoice, isInvoice } from "@/lib/invoices";
 
 export function CloudInvoices({ children }: {
@@ -15,12 +14,13 @@ export function CloudInvoices({ children }: {
     let active = true;
     async function load() {
       try {
-        const { data, error } = await getSupabase().from("invoices").select("*").order("issueDate", { ascending: false });
-        if (error) throw error;
-        if (!data.every(isInvoice)) throw new Error("The saved invoices have an unexpected format.");
-        if (active) { setInvoices(data); setLoaded(true); setError(""); }
+        const response = await fetch("/api/invoices");
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "Could not load invoices.");
+        if (!body.invoices.every(isInvoice)) throw new Error("The saved invoices have an unexpected format.");
+        if (active) { setInvoices(body.invoices); setLoaded(true); setError(""); }
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Could not load invoices. Check that the invoices table has been created in Supabase.");
+        if (active) setError(err instanceof Error ? err.message : "Could not load invoices. Check your connection and try again.");
       }
     }
     void load();
@@ -29,21 +29,20 @@ export function CloudInvoices({ children }: {
 
   async function save(invoice: Invoice) {
     try {
-      const { data, error } = await getSupabase().from("invoices").upsert(invoice, { onConflict: "id" }).select().single();
-      if (error) return error.message;
-      if (!isInvoice(data)) return "The database returned an unexpected result. Reload before retrying.";
-      setInvoices(current => [...current.filter(entry => entry.id !== data.id), data]);
+      const response = await fetch("/api/invoices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(invoice) });
+      const body = await response.json();
+      if (!response.ok) return body.error ?? "Could not save the invoice.";
+      if (!isInvoice(body.invoice)) return "The database returned an unexpected result. Reload before retrying.";
+      setInvoices(current => [...current.filter(entry => entry.id !== body.invoice.id), body.invoice]);
       return null;
-    } catch { return "Could not save to Supabase. Check your connection and try again."; }
+    } catch { return "Could not save to the server. Check your connection and try again."; }
   }
 
   async function remove(id: string) {
     try {
-      const { data, error } = await getSupabase().from("invoices").delete().eq("id", id).select("id");
-      if (error) return error.message;
-      if (!data || data.length !== 1 || data[0].id !== id) {
-        return "Deletion was not confirmed. Refresh the page and try again.";
-      }
+      const response = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
+      const body = await response.json();
+      if (!response.ok) return body.error ?? "Could not delete the invoice.";
       setInvoices(current => current.filter(invoice => invoice.id !== id));
       return null;
     } catch { return "Could not delete the invoice. Check your connection and try again."; }

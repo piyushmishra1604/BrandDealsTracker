@@ -28,7 +28,10 @@ export const currencySymbols: Record<CurrencyCode, string> = { INR: "₹", USD: 
 export type Invoice = {
   id: string;
   invoiceNumber: string;
+  // Internal reference back to the deal only; never shown on the invoice itself.
   brand: string;
+  // The brand's legal/company name, shown on the invoice as the Bill To recipient.
+  companyName: string;
   billToAddress?: string;
   issueDate: string;
   dueDate: string;
@@ -59,6 +62,7 @@ export function isInvoice(value: unknown): value is Invoice {
   return typeof invoice.id === "string" && !!invoice.id
     && typeof invoice.invoiceNumber === "string" && !!invoice.invoiceNumber.trim() && invoice.invoiceNumber.length <= 40
     && typeof invoice.brand === "string" && !!invoice.brand.trim() && invoice.brand.length <= 120
+    && typeof invoice.companyName === "string" && !!invoice.companyName.trim() && invoice.companyName.length <= 120
     && (invoice.billToAddress === undefined || (typeof invoice.billToAddress === "string" && invoice.billToAddress.length <= 1000))
     && isDate(invoice.issueDate) && isDate(invoice.dueDate)
     && currencies.some(entry => entry.code === invoice.currency)

@@ -28,6 +28,10 @@ export function Sidebar() {
           );
         })}
       </nav>
+      <button type="button" onClick={() => void fetch("/api/auth/logout", { method: "POST" }).then(() => { window.location.reload(); })} className="mt-5 flex shrink-0 cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-[#405579] hover:bg-[#e8efff] md:mt-3">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M15 17v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1M10 12h10m0 0-3-3m3 3-3 3" /></svg>
+        Sign Out
+      </button>
     </aside>
   );
 }

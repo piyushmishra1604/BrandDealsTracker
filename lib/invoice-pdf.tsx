@@ -42,7 +42,7 @@ export function InvoicePdfDocument({ invoice }: { invoice: Invoice }) {
         <View style={[styles.row, styles.sectionTop]}>
           <View>
             <Text style={styles.label}>Bill To</Text>
-            <Text style={styles.bold}>{invoice.brand}</Text>
+            <Text style={styles.bold}>{invoice.companyName}</Text>
             {invoice.billToAddress && <Text style={[styles.muted, { marginTop: 4 }]}>{invoice.billToAddress}</Text>}
           </View>
           <View>

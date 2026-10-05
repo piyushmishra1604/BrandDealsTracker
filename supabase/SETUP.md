@@ -27,3 +27,23 @@ Run `supabase/migrations/202609190004_add_deliverables.sql` before saving the ne
 ## Dashboard detail styling and contacts
 
 Run `supabase/migrations/202609190005_add_brand_contact.sql` after the deliverables migration. Category, contact name, email, and WhatsApp number are optional and editable in Add/Edit. Use international phone format such as +491234567890. The WhatsApp button opens the contact without sending a message; Copy contact copies the stored details. The dashboard does not display brand avatars.
+
+## Custom authentication (replaces Supabase Auth)
+
+The app no longer uses Supabase Auth or the publishable key for data access. All reads/writes go through Next.js API routes (`app/api/**`) using the Supabase **service role key**, with ownership enforced in application code against a custom `public.app_users` table (email + bcrypt password hash). Sessions are our own signed JWT stored in an httpOnly cookie.
+
+Run these migrations in order after the earlier ones:
+- `202610040002_add_user_ownership_and_auth_rls.sql`
+- `202610040003_scope_invoice_pdf_writes_to_owner.sql`
+- `202610040004_profile_id_random_default.sql`
+- `202610040005_create_app_users_and_reset_tokens.sql`
+- `202610040006_repoint_user_id_to_app_users.sql`
+- `202610050001_add_email_verification.sql`
+- `202610060001_drop_email_verification.sql`
+- `202610060002_drop_password_reset.sql`
+
+Required `.env.local` additions (never prefix these with `NEXT_PUBLIC_`):
+- `SUPABASE_SERVICE_ROLE_KEY` — from Supabase dashboard → Settings → API → service_role (secret) key.
+- `AUTH_JWT_SECRET` — any long random string, used only to sign our session cookies.
+
+Signup is open to anyone with an email/password (8-200 chars); a session is created immediately on signup or login. Every brand-new account also gets an empty profile row created automatically.

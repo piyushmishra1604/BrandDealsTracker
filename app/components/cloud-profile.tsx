@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { getSupabase } from "@/lib/supabase/client";
-import { type Profile, defaultProfileId, isProfile } from "@/lib/profile";
+import { type Profile, isProfile } from "@/lib/profile";
 
 export function CloudProfile({ children }: {
   children: (profile: Profile, save: (profile: Profile) => Promise<string | null>) => ReactNode;
@@ -14,12 +13,13 @@ export function CloudProfile({ children }: {
     let active = true;
     async function load() {
       try {
-        const { data, error } = await getSupabase().from("profile").select("*").eq("id", defaultProfileId).single();
-        if (error) throw error;
-        if (!isProfile(data)) throw new Error("The saved profile has an unexpected format.");
-        if (active) { setProfile(data); setError(""); }
+        const response = await fetch("/api/profile");
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "Could not load your profile.");
+        if (!isProfile(body.profile)) throw new Error("The saved profile has an unexpected format.");
+        if (active) { setProfile(body.profile); setError(""); }
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Could not load your profile. Check that the profile table has been created in Supabase.");
+        if (active) setError(err instanceof Error ? err.message : "Could not load your profile. Check your connection and try again.");
       }
     }
     void load();
@@ -28,12 +28,13 @@ export function CloudProfile({ children }: {
 
   async function save(updated: Profile) {
     try {
-      const { data, error } = await getSupabase().from("profile").update(updated).eq("id", defaultProfileId).select().single();
-      if (error) return error.message;
-      if (!isProfile(data)) return "The database returned an unexpected result. Reload before retrying.";
-      setProfile(data);
+      const response = await fetch("/api/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updated) });
+      const body = await response.json();
+      if (!response.ok) return body.error ?? "Could not save your profile.";
+      if (!isProfile(body.profile)) return "The database returned an unexpected result. Reload before retrying.";
+      setProfile(body.profile);
       return null;
-    } catch { return "Could not save to Supabase. Check your connection and try again."; }
+    } catch { return "Could not save to the server. Check your connection and try again."; }
   }
 
   const button = "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50";

@@ -40,5 +40,3 @@ export function isProfile(value: unknown): value is Profile {
     && (profile.senderAddress === undefined || (typeof profile.senderAddress === "string" && profile.senderAddress.length <= 300))
     && isBankAccounts(profile.bankAccounts);
 }
-
-export const defaultProfileId = "default";

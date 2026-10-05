@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { getSupabase } from "@/lib/supabase/client";
 import { type Deal, isDeal, dealDateError } from "@/lib/deals";
 
 const button = "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50";
@@ -17,12 +16,13 @@ export function CloudDashboard({ children }: {
     let active = true;
     async function load() {
       try {
-        const { data, error } = await getSupabase().from("deals").select("*").order("dealDate", { ascending: false });
-        if (error) throw error;
-        if (!data.every(isDeal)) throw new Error("The saved deals have an unexpected format.");
-        if (active) { setDeals(data); setLoaded(true); setError(""); }
+        const response = await fetch("/api/deals");
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "Could not load deals.");
+        if (!body.deals.every(isDeal)) throw new Error("The saved deals have an unexpected format.");
+        if (active) { setDeals(body.deals); setLoaded(true); setError(""); }
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Could not load deals. Check that the deals table has been created in Supabase.");
+        if (active) setError(err instanceof Error ? err.message : "Could not load deals. Check your connection and try again.");
       }
     }
     void load();
@@ -33,23 +33,20 @@ export function CloudDashboard({ children }: {
     const dateError = dealDateError(deal);
     if (dateError) return dateError;
     try {
-      const { data, error } = await getSupabase().from("deals").upsert(deal, { onConflict: "id" }).select().single();
-      if (error) return error.message;
-      if (!isDeal(data)) return "The database returned an unexpected result. Reload before retrying.";
-      setDeals(current => [...current.filter(item => item.id !== data.id), data]);
+      const response = await fetch("/api/deals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(deal) });
+      const body = await response.json();
+      if (!response.ok) return body.error ?? "Could not save the deal.";
+      if (!isDeal(body.deal)) return "The database returned an unexpected result. Reload before retrying.";
+      setDeals(current => [...current.filter(item => item.id !== body.deal.id), body.deal]);
       return null;
-    } catch { return "Could not save to Supabase. Check your connection and try again."; }
+    } catch { return "Could not save to the server. Check your connection and try again."; }
   }
 
   async function remove(id: string) {
     try {
-      const { data, error } = await getSupabase().from("deals").delete().eq("id", id).select("id");
-      if (error) return error.code === "42501"
-        ? "Delete access is not enabled yet. Run the shared-deal delete migration in Supabase, then try again."
-        : error.message;
-      if (!data || data.length !== 1 || data[0].id !== id) {
-        return "Deletion was not confirmed. Refresh the page, or check that delete access is enabled in Supabase.";
-      }
+      const response = await fetch(`/api/deals/${id}`, { method: "DELETE" });
+      const body = await response.json();
+      if (!response.ok) return body.error ?? "Could not delete the deal.";
       setDeals(current => current.filter(deal => deal.id !== id));
       return null;
     } catch { return "Could not delete the deal. Check your connection and try again."; }
