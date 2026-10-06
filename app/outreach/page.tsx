@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { Plus } from "lucide-react";
 import { todayDate } from "@/lib/deals";
 import { type Outreach, type OutreachSource, type OutreachStatus, outreachSources, outreachStatuses, isOutreach } from "@/lib/outreach";
 import { CloudOutreach } from "../components/cloud-outreach";
@@ -16,8 +17,8 @@ const cardIcons = {
 function StatCard({ title, value, icon, caption }: { title: string; value: string; icon: keyof typeof cardIcons; caption: string }) {
   const { color, path } = cardIcons[icon];
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-[#e5ebf5] bg-[#f9fbff] p-5">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${color}`}>
+    <div className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04)] transition-shadow hover:shadow-[0_4px_16px_rgba(16,24,64,0.08)]">
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${color}`}>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d={path} /></svg>
       </span>
       <div className="min-w-0 pt-1">
@@ -102,9 +103,9 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
           <button
             type="button"
             onClick={() => setNewOutreach({ id: crypto.randomUUID(), brandName: "", contactPerson: "", contactRole: "", source: "Other", dateReachedOut: todayDate(), status: "New", notes: "" })}
-            className="rounded-lg bg-[#243657] px-5 py-3 text-sm font-semibold text-white shadow-[0_3px_10px_#20345c20] transition-colors hover:bg-[#172846] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
-            + Add Brand
+            <Plus className="h-4 w-4" strokeWidth={2.4} /> Add Brand
           </button>
         </div>
 
@@ -122,7 +123,7 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
         </section>
 
         <section aria-label="Filter brand outreach" className="mb-7 flex flex-wrap items-center justify-between gap-4">
-          <button type="button" aria-pressed="true" className="shrink-0 rounded-full bg-[#e8efff] px-4 py-2.5 text-sm font-medium text-[#0655ff]">
+          <button type="button" aria-pressed="true" className="shrink-0 rounded-full bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-600">
             All
           </button>
           <label className="w-full sm:w-64">
@@ -132,12 +133,12 @@ function BrandOutreach({ outreach, persistOutreach, removeOutreach }: {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search brands…"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-2 focus:outline-blue-600"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm transition-colors focus:border-brand-400 focus:outline-2 focus:outline-brand-500"
             />
           </label>
         </section>
 
-        <section aria-labelledby="outreach-heading" className="overflow-hidden rounded-xl border border-[#e5ebf5] bg-white">
+        <section aria-labelledby="outreach-heading" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
           <div className="flex items-center justify-between gap-4 border-b border-[#e5ebf5] px-5 py-5">
             <h2 id="outreach-heading" className="text-lg font-bold">Brand Outreach</h2>
           </div>
@@ -297,7 +298,7 @@ function OutreachEditor({ item, onSave, onCancel }: {
       </label>
       {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
       <div className="mt-5 flex items-center gap-3">
-        <button type="submit" className="cursor-pointer rounded-lg bg-[#243657] px-4 py-2 text-sm font-semibold text-white hover:bg-[#172846]">{saving ? "Saving…" : item.brandName ? "Save changes" : "Add Brand"}</button>
+        <button type="submit" className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90">{saving ? "Saving…" : item.brandName ? "Save changes" : "Add Brand"}</button>
         <button type="button" onClick={onCancel} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm">Cancel</button>
         <p className="text-xs text-[#53668e]">Saved to Supabase.</p>
       </div>
@@ -534,15 +535,15 @@ function SourceBadge({ source }: { source: OutreachSource }) {
 }
 
 const statusColors: Record<OutreachStatus, string> = {
-  New: "bg-[#e8efff] text-[#0655ff]",
-  "In Conversation": "bg-[#fff0cc] text-[#bd790d]",
-  Interested: "bg-[#d9f5e8] text-[#087a4d]",
-  "Not Interested": "bg-[#ffe3e3] text-[#c0392b]",
-  Converted: "bg-[#d9f5e8] text-[#087a4d]",
+  New: "bg-brand-50 text-brand-600",
+  "In Conversation": "bg-amber-50 text-amber-700",
+  Interested: "bg-emerald-50 text-emerald-700",
+  "Not Interested": "bg-rose-50 text-rose-700",
+  Converted: "bg-emerald-50 text-emerald-700",
 };
 
 function OutreachStatusBadge({ status }: { status: OutreachStatus }) {
-  return <span className={`inline-flex whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ${statusColors[status]}`}>{status}</span>;
+  return <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[status]}`}><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />{status}</span>;
 }
 
 // Same corner-triangle style as the Deals table's status indicator.

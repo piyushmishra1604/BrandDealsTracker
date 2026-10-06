@@ -1,7 +1,9 @@
 "use client";
 
+import { Banknote, Plus, User } from "lucide-react";
 import { useState } from "react";
 import { type BankAccount, type Profile } from "@/lib/profile";
+import { FormSection } from "../components/form-section";
 import { CloudProfile } from "../components/cloud-profile";
 import { Sidebar } from "../components/sidebar";
 
@@ -21,7 +23,7 @@ function ProfileForm({ profile, saveProfile }: {
   const [notice, setNotice] = useState("");
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
 
-  const inputClass = "mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600";
+  const inputClass = "mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm transition-colors focus:border-brand-400 focus:outline-2 focus:outline-brand-500";
 
   function updateAccount(id: string, patch: Partial<BankAccount>) {
     setDraft(current => ({ ...current, bankAccounts: current.bankAccounts.map(account => account.id === id ? { ...account, ...patch } : account) }));
@@ -84,9 +86,7 @@ function ProfileForm({ profile, saveProfile }: {
         </div>
 
         <div className="max-w-2xl space-y-6">
-          <fieldset className="rounded-xl border border-[#e5ebf5] p-5">
-            <legend className="px-1 text-base font-bold">Your Details</legend>
-            <p className="mb-4 text-xs text-[#53668e]">Shown as the &ldquo;From&rdquo; details on every invoice.</p>
+          <FormSection step={1} icon={User} title="Your Details" description="Shown as the “From” details on every invoice.">
             <div className="grid gap-4">
               <label className="text-xs text-[#405579]">Brand Name
                 <input maxLength={120} placeholder="e.g. Ball Lifestyle" value={draft.brandName ?? ""} onChange={(event) => setDraft(current => ({ ...current, brandName: event.target.value }))} className={inputClass} />
@@ -104,18 +104,17 @@ function ProfileForm({ profile, saveProfile }: {
                 </label>
               </div>
             </div>
-          </fieldset>
+          </FormSection>
 
-          <fieldset className="rounded-xl border border-[#e5ebf5] p-5">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <legend className="px-1 text-base font-bold">Bank Accounts</legend>
-                <p className="text-xs text-[#53668e]">Add one or more accounts to choose from when creating an invoice.</p>
-              </div>
-              <button type="button" disabled={draft.bankAccounts.length >= 20} onClick={addAccount} className="shrink-0 cursor-pointer rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-600 disabled:opacity-50">
-                + Add Account
-              </button>
-            </div>
+          <FormSection
+            step={2}
+            icon={Banknote}
+            title="Bank Accounts"
+            description="Add one or more accounts to choose from when creating an invoice."
+            action={<button type="button" disabled={draft.bankAccounts.length >= 20} onClick={addAccount} className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-100 disabled:opacity-50">
+              <Plus className="h-4 w-4" strokeWidth={2.2} /> Add Account
+            </button>}
+          >
             {draft.bankAccounts.length === 0 && <p className="text-sm text-[#53668e]">No bank accounts added yet.</p>}
             <div className="space-y-3">
               {draft.bankAccounts.map((account, index) => {
@@ -157,11 +156,11 @@ function ProfileForm({ profile, saveProfile }: {
                 );
               })}
             </div>
-          </fieldset>
+          </FormSection>
 
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           <div className="flex items-center gap-3">
-            <button type="button" disabled={saving} onClick={() => void handleSave()} className="cursor-pointer rounded-lg bg-[#243657] px-5 py-3 text-sm font-semibold text-white hover:bg-[#172846] disabled:opacity-50">
+            <button type="button" disabled={saving} onClick={() => void handleSave()} className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
               {saving ? "Saving…" : "Save Profile"}
             </button>
             <p role="status" className="text-sm text-[#53668e]">{notice}</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { type Invoice, invoiceTotal, currencySymbols } from "@/lib/invoices";
 import { CloudInvoices } from "../components/cloud-invoices";
@@ -55,8 +56,8 @@ function InvoiceList({ invoices, removeInvoice }: { invoices: Invoice[]; removeI
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Invoices</h1>
             <p className="mt-1.5 text-sm text-[#53668e] sm:text-base">Create and send professional invoices for your brand deals.</p>
           </div>
-          <Link href="/invoices/new" className="rounded-lg bg-[#243657] px-5 py-3 text-sm font-semibold text-white shadow-[0_3px_10px_#20345c20] transition-colors hover:bg-[#172846] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
-            + Create Invoice
+          <Link href="/invoices/new" className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+            <Plus className="h-4 w-4" strokeWidth={2.4} /> Create Invoice
           </Link>
         </div>
 
@@ -70,12 +71,12 @@ function InvoiceList({ invoices, removeInvoice }: { invoices: Invoice[]; removeI
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search brand or invoice #…"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-2 focus:outline-blue-600"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm transition-colors focus:border-brand-400 focus:outline-2 focus:outline-brand-500"
             />
           </label>
         </section>
 
-        <section aria-labelledby="invoices-heading" className="overflow-hidden rounded-xl border border-[#e5ebf5] bg-white">
+        <section aria-labelledby="invoices-heading" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
           <div className="flex items-center justify-between gap-4 border-b border-[#e5ebf5] px-5 py-5">
             <h2 id="invoices-heading" className="text-lg font-bold">All Invoices</h2>
           </div>
