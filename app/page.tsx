@@ -1,12 +1,14 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { Plus } from "lucide-react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
 import { type Invoice, currencySymbols, invoiceTotal } from "@/lib/invoices";
 import { CloudDashboard } from "./components/cloud-dashboard";
 import { CloudInvoices } from "./components/cloud-invoices";
 import { CreateInvoiceButton } from "./components/invoice-modal";
 import { Sidebar } from "./components/sidebar";
+import { ViewInvoiceButton } from "./components/view-invoice-modal";
 
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -126,8 +128,8 @@ function Dashboard({ deals, persistDeal, removeDeal, invoices }: { deals: Deal[]
             </p>
           </div>
 
-          <button type="button" onClick={() => setNewDeal({ id: crypto.randomUUID(), brand: "", amount: 0, dealDate: todayDate(), dueDate: todayDate(), contentCreated: false, sentToBrand: false, posted: false, moneyReceived: false })} className="rounded-lg bg-[#243657] px-5 py-3 text-sm font-semibold text-white shadow-[0_3px_10px_#20345c20] transition-colors hover:bg-[#172846] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
-            + Add Brand Deal
+          <button type="button" onClick={() => setNewDeal({ id: crypto.randomUUID(), brand: "", amount: 0, dealDate: todayDate(), dueDate: todayDate(), contentCreated: false, sentToBrand: false, posted: false, moneyReceived: false })} className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+            <Plus className="h-4 w-4" strokeWidth={2.4} /> Add Brand Deal
           </button>
         </div>
 
@@ -199,7 +201,7 @@ function Dashboard({ deals, persistDeal, removeDeal, invoices }: { deals: Deal[]
         </section>
 
         {/* Recent deals use the same month filter as the summary cards. */}
-        <section aria-labelledby="recent-deals-heading" className="overflow-hidden rounded-xl border border-[#e5ebf5] bg-white">
+        <section aria-labelledby="recent-deals-heading" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
           <div className="flex items-center justify-between gap-4 border-b border-[#e5ebf5] px-5 py-5">
             <h2 id="recent-deals-heading" className="text-lg font-bold">Recent Deals</h2>
             <button type="button" disabled title="The full Deals page is coming soon" className="shrink-0 cursor-not-allowed text-sm text-[#5478b5]">
@@ -546,10 +548,10 @@ function DealDetails({ deal, onSave, invoices }: { deal: Deal; onSave: (deal: De
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="whitespace-nowrap text-sm font-semibold tabular-nums">{currencySymbols[invoice.currency]}{new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(invoiceTotal(invoice))}</span>
                   {invoice.pdfUrl && <>
-                    <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
-                      View Invoice<span className="sr-only"> (opens in a new tab)</span>
-                    </a>
-                    <a href={`${invoice.pdfUrl}?download=${invoice.invoiceNumber}.pdf`} onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
+                    <ViewInvoiceButton invoice={invoice} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
+                      View Invoice
+                    </ViewInvoiceButton>
+                    <a href={`${invoice.pdfUrl}?download=${invoice.invoiceNumber}.pdf&v=${encodeURIComponent(invoice.updated_at ?? "")}`} onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
                       Download PDF
                     </a>
                   </>}
@@ -728,8 +730,8 @@ function StatCard({ title, value, icon }: {
 }) {
   const { color, path } = cardIcons[icon];
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-[#e5ebf5] bg-[#f9fbff] p-5">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${color}`}>
+    <div className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04)] transition-shadow hover:shadow-[0_4px_16px_rgba(16,24,64,0.08)]">
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${color}`}>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d={path} /></svg>
       </span>
       <div className="min-w-0 pt-1">
@@ -785,13 +787,13 @@ function StatusCorner({ deal }: { deal: Deal }) {
 function DealStatus({ deal }: { deal: Deal }) {
   const status = getDealStatus(deal);
   const colors = {
-    Settled: "bg-[#d9f5e8] text-[#087a4d]",
-    Posted: "bg-[#e8efff] text-[#0655ff]",
-    "Sent to Brand": "bg-[#e8efff] text-[#0655ff]",
-    Created: "bg-[#e8efff] text-[#0655ff]",
-    "Not Started": "bg-slate-100 text-slate-600",
+    Settled: "bg-emerald-50 text-emerald-700",
+    Posted: "bg-brand-50 text-brand-600",
+    "Sent to Brand": "bg-brand-50 text-brand-600",
+    Created: "bg-brand-50 text-brand-600",
+    "Not Started": "bg-amber-50 text-amber-700",
   };
-  return <span className={`inline-flex whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ${colors[status]}`}>{status}</span>;
+  return <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${colors[status]}`}><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />{status}</span>;
 }
 
 function formatDate(date: string) {
@@ -909,7 +911,7 @@ function DealEditor({ deal, onSave, onCancel }: {
       </fieldset>
       {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
       <div className="mt-5 flex items-center gap-3">
-        <button type="submit" className="cursor-pointer rounded-lg bg-[#243657] px-4 py-2 text-sm font-semibold text-white hover:bg-[#172846]">{saving ? "Saving…" : "Save changes"}</button>
+        <button type="submit" className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90">{saving ? "Saving…" : "Save changes"}</button>
         <button type="button" onClick={onCancel} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm">Cancel</button>
         <p className="text-xs text-[#53668e]">Saved to Supabase.</p>
       </div>

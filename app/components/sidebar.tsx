@@ -1,35 +1,41 @@
 "use client";
 
+import { LayoutDashboard, Mail, FileText, User, Settings, LogOut, Handshake } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navigation = [
-  { label: "Dashboard", href: "/", path: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9" },
-  { label: "Brand Outreach", href: "/outreach", path: "M3 6h18v12H3V6Zm0 0 9 7 9-7" },
-  { label: "Invoices", href: "/invoices", path: "M7 3h8l4 4v14H7V3Zm8 0v4h4M9 12h6M9 16h6M9 8h2" },
-  { label: "Profile", href: "/profile", path: "M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 0c-4.5 0-8 2.5-8 6v1h16v-1c0-3.5-3.5-6-8-6Z" },
-  { label: "Settings", href: null, path: "m9 3-1 3-3 1-2 4 2 2v4l4 3 3-1 3 1 4-3v-4l2-2-2-4-3-1-1-3H9Zm6 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
+  { label: "Dashboard", href: "/", icon: LayoutDashboard, tint: "text-blue-600 bg-blue-50" },
+  { label: "Brand Outreach", href: "/outreach", icon: Mail, tint: "text-purple-600 bg-purple-50" },
+  { label: "Invoices", href: "/invoices", icon: FileText, tint: "text-brand-600 bg-brand-50" },
+  { label: "Profile", href: "/profile", icon: User, tint: "text-teal-600 bg-teal-50" },
+  { label: "Settings", href: null, icon: Settings, tint: "text-orange-600 bg-orange-50" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   return (
     <aside className="flex shrink-0 flex-col border-b border-[#edf1f8] bg-[#f7f9fd] px-4 py-5 md:w-52 md:border-r md:border-b-0 md:py-7 lg:w-56">
-      <p className="mb-5 px-3 text-xl font-bold tracking-tight md:mb-8">BrandTracker</p>
+      <p className="mb-5 flex items-center gap-2.5 px-3 text-xl font-bold tracking-tight md:mb-8">
+        <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-accent-600 text-white shadow-sm">
+          <Handshake className="h-4 w-4" strokeWidth={2.2} />
+        </span>
+        BrandTracker
+      </p>
       <nav aria-label="Main navigation" className="flex gap-2 overflow-x-auto pb-1 md:flex-1 md:flex-col md:overflow-visible">
-        {navigation.map(({ label, href, path }) => {
+        {navigation.map(({ label, href, icon: Icon, tint }) => {
           const active = href !== null && (pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)));
-          const classes = `flex shrink-0 items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium ${label === "Settings" ? "md:mt-auto" : ""} ${active ? "bg-[#e8efff] text-[#0655ff]" : "text-[#405579]"}`;
-          const contents = <><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d={path} /></svg>{label}</>;
+          const classes = `flex shrink-0 items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors ${label === "Settings" ? "md:mt-auto" : ""} ${active ? "bg-brand-50 text-brand-600" : "text-[#405579] hover:bg-brand-50/60"}`;
+          const contents = <><span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${tint}`}><Icon className="h-4 w-4" strokeWidth={2} /></span>{label}</>;
           return href !== null ? (
-            <Link key={label} href={href} aria-current={active ? "page" : undefined} className={`${classes} focus-visible:outline-2 focus-visible:outline-blue-600`}>{contents}</Link>
+            <Link key={label} href={href} aria-current={active ? "page" : undefined} className={`${classes} focus-visible:outline-2 focus-visible:outline-brand-600`}>{contents}</Link>
           ) : (
             <button key={label} type="button" disabled title={`${label} is coming in a later milestone`} className={`${classes} cursor-not-allowed`}>{contents}<span className="sr-only"> (coming soon)</span></button>
           );
         })}
       </nav>
-      <button type="button" onClick={() => void fetch("/api/auth/logout", { method: "POST" }).then(() => { window.location.reload(); })} className="mt-5 flex shrink-0 cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-[#405579] hover:bg-[#e8efff] md:mt-3">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M15 17v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1M10 12h10m0 0-3-3m3 3-3 3" /></svg>
+      <button type="button" onClick={() => void fetch("/api/auth/logout", { method: "POST" }).then(() => { window.location.reload(); })} className="mt-5 flex shrink-0 cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-[#405579] transition-colors hover:bg-brand-50 md:mt-3">
+        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-600"><LogOut className="h-4 w-4" strokeWidth={2} /></span>
         Sign Out
       </button>
     </aside>

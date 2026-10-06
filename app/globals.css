@@ -4,6 +4,18 @@
   --background: #ffffff;
   --foreground: #101c40;
   color-scheme: light;
+
+  /* Brand accent palette (indigo/violet gradient system). Additive — existing
+     hardcoded hex values elsewhere are untouched until migrated screen by screen. */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-accent-500: #a855f7;
+  --color-accent-600: #9333ea;
 }
 
 @theme inline {
@@ -11,6 +23,16 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-brand-50: var(--color-brand-50);
+  --color-brand-100: var(--color-brand-100);
+  --color-brand-200: var(--color-brand-200);
+  --color-brand-400: var(--color-brand-400);
+  --color-brand-500: var(--color-brand-500);
+  --color-brand-600: var(--color-brand-600);
+  --color-brand-700: var(--color-brand-700);
+  --color-accent-500: var(--color-accent-500);
+  --color-accent-600: var(--color-accent-600);
 }
 
 body {
@@ -18,3 +40,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Soft decorative gradient blobs used behind cards on redesigned screens. */
+.bg-brand-blobs {
+  background-image:
+    radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--color-brand-400) 18%, transparent) 0%, transparent 45%),
+    radial-gradient(circle at 90% 20%, color-mix(in srgb, var(--color-accent-500) 16%, transparent) 0%, transparent 45%),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--color-brand-200) 30%, transparent) 0%, transparent 50%);
+}
+

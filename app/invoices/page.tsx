@@ -5,6 +5,7 @@ import { useState } from "react";
 import { type Invoice, invoiceTotal, currencySymbols } from "@/lib/invoices";
 import { CloudInvoices } from "../components/cloud-invoices";
 import { Sidebar } from "../components/sidebar";
+import { ViewInvoiceButton } from "../components/view-invoice-modal";
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -105,10 +106,10 @@ function InvoiceList({ invoices, removeInvoice }: { invoices: Invoice[]; removeI
                     <td className="whitespace-nowrap px-3 py-2">
                       <div className="flex items-center gap-2">
                         {invoice.pdfUrl && <>
-                          <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer" className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
-                            View Invoice<span className="sr-only"> (opens in a new tab)</span>
-                          </a>
-                          <a href={`${invoice.pdfUrl}?download=${invoice.invoiceNumber}.pdf`} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
+                          <ViewInvoiceButton invoice={invoice} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
+                            View Invoice
+                          </ViewInvoiceButton>
+                          <a href={`${invoice.pdfUrl}?download=${invoice.invoiceNumber}.pdf&v=${encodeURIComponent(invoice.updated_at ?? "")}`} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
                             Download PDF
                           </a>
                         </>}
