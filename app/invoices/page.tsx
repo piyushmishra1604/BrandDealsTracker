@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { type Invoice, invoiceTotal, currencySymbols } from "@/lib/invoices";
+import { type Invoice, invoiceTotal, invoiceFileName, currencySymbols } from "@/lib/invoices";
 import { CloudInvoices } from "../components/cloud-invoices";
 import { Sidebar } from "../components/sidebar";
 import { ViewInvoiceButton } from "../components/view-invoice-modal";
@@ -110,7 +110,7 @@ function InvoiceList({ invoices, removeInvoice }: { invoices: Invoice[]; removeI
                           <ViewInvoiceButton invoice={invoice} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
                             View Invoice
                           </ViewInvoiceButton>
-                          <a href={`${invoice.pdfUrl}?download=${invoice.invoiceNumber}.pdf&v=${encodeURIComponent(invoice.updated_at ?? "")}`} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
+                          <a href={`${invoice.pdfUrl}?download=${invoiceFileName(invoice)}&v=${encodeURIComponent(invoice.updated_at ?? "")}`} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">
                             Download PDF
                           </a>
                         </>}

@@ -56,6 +56,13 @@ export function invoiceTotal(invoice: Pick<Invoice, "items">) {
   return invoice.items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
 }
 
+// Human-friendly download file name, e.g. "Ball-Lifestyle-INV-001.pdf".
+export function invoiceFileName(invoice: Pick<Invoice, "brand" | "invoiceNumber">) {
+  const safeBrand = invoice.brand.trim().replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const safeNumber = invoice.invoiceNumber.trim().replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${safeBrand || "Invoice"}-${safeNumber || "invoice"}.pdf`;
+}
+
 export function isInvoice(value: unknown): value is Invoice {
   if (!value || typeof value !== "object") return false;
   const invoice = value as Invoice;

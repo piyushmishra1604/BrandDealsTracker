@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import { Plus } from "lucide-react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
-import { type Invoice, currencySymbols, invoiceTotal } from "@/lib/invoices";
+import { type Invoice, currencySymbols, invoiceTotal, invoiceFileName } from "@/lib/invoices";
 import { CloudDashboard } from "./components/cloud-dashboard";
 import { CloudInvoices } from "./components/cloud-invoices";
 import { CreateInvoiceButton } from "./components/invoice-modal";
@@ -551,7 +551,7 @@ function DealDetails({ deal, onSave, invoices }: { deal: Deal; onSave: (deal: De
                     <ViewInvoiceButton invoice={invoice} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
                       View Invoice
                     </ViewInvoiceButton>
-                    <a href={`${invoice.pdfUrl}?download=${invoice.invoiceNumber}.pdf&v=${encodeURIComponent(invoice.updated_at ?? "")}`} onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
+                    <a href={`${invoice.pdfUrl}?download=${invoiceFileName(invoice)}&v=${encodeURIComponent(invoice.updated_at ?? "")}`} onClick={(event) => event.stopPropagation()} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">
                       Download PDF
                     </a>
                   </>}
