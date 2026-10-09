@@ -1,5 +1,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { requireManagerAccount } from "./account";
+import { redirect } from "next/navigation";
+import { requireManagerAccount, getAccountType } from "./account";
+import { getCurrentUser } from "./session";
 import type { SessionPayload } from "./jwt";
 
 export type WorkspaceRole = "owner" | "manager" | "member";
@@ -48,4 +50,17 @@ export async function getPrimaryWorkspace(userId: string): Promise<{ id: string;
   const workspace = Array.isArray(data.workspaces) ? data.workspaces[0] : data.workspaces;
   if (!workspace?.name) return null;
   return { id: data.workspace_id, name: workspace.name, role: data.role };
+}
+
+// Shared server-side guard for every manager page (app/manager/**): re-verifies
+// account_type and workspace membership on each page render, per Next.js's own
+// guidance that layouts alone aren't re-invoked on client navigation.
+export async function requireManagerWorkspace(): Promise<{ user: SessionPayload; workspace: { id: string; name: string; role: WorkspaceRole } }> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/");
+  const accountType = await getAccountType(user.sub);
+  if (accountType !== "manager") redirect("/");
+  const workspace = await getPrimaryWorkspace(user.sub);
+  if (!workspace) redirect("/manager");
+  return { user, workspace };
 }
