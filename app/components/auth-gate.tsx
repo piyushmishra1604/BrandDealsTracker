@@ -56,7 +56,7 @@ function LoginScreen({ onSignedIn }: { onSignedIn: (user: CurrentUser) => void }
       const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
       const payload = mode === "signup"
         ? { email, password, accountType, ...(accountType === "manager" ? { workspaceName } : {}) }
-        : { email, password };
+        : { email, password, accountType };
       const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const body = await response.json();
       if (!response.ok) { setError(body.error ?? "Something went wrong. Please try again."); return; }
@@ -73,22 +73,20 @@ function LoginScreen({ onSignedIn }: { onSignedIn: (user: CurrentUser) => void }
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-[0_8px_32px_#20345c08]">
         <h1 className="text-xl font-bold tracking-tight">{titles[mode]}</h1>
         <form onSubmit={(event) => { event.preventDefault(); void submit(); }} className="mt-5 space-y-4">
-          {mode === "signup" && (
-            <div role="radiogroup" aria-label="Account type" className="grid grid-cols-2 gap-2">
-              {(["creator", "manager"] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  role="radio"
-                  aria-checked={accountType === type}
-                  onClick={() => setAccountType(type)}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${accountType === type ? "border-[#243657] bg-[#243657] text-white" : "border-slate-200 bg-white text-[#405579] hover:bg-slate-50"}`}
-                >
-                  {type === "creator" ? "I'm a Creator" : "I'm a Manager"}
-                </button>
-              ))}
-            </div>
-          )}
+          <div role="radiogroup" aria-label="Account type" className="grid grid-cols-2 gap-2">
+            {(["creator", "manager"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                role="radio"
+                aria-checked={accountType === type}
+                onClick={() => setAccountType(type)}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${accountType === type ? "border-[#243657] bg-[#243657] text-white" : "border-slate-200 bg-white text-[#405579] hover:bg-slate-50"}`}
+              >
+                {mode === "signup" ? (type === "creator" ? "I'm a Creator" : "I'm a Manager") : (type === "creator" ? "Sign in as Creator" : "Sign in as Manager")}
+              </button>
+            ))}
+          </div>
           <label className="block text-xs text-[#405579]">Email
             <input type="email" required autoFocus value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600" />
           </label>
