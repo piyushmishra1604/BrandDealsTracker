@@ -12,7 +12,10 @@ function formatBudget(campaign: Pick<Campaign, "budget" | "currency">) {
 }
 
 // Shared by the manager dashboard's "recent campaigns" panel (WP2.3) and the full
-// campaign list page (WP3.3), so both present campaigns identically.
+// campaign list page (WP3.3), so both present campaigns identically. Title and brand
+// are grouped in one "Campaign" column (title primary, brand as a byline beneath it),
+// matching the campaign detail page's header instead of splitting them into two
+// equally-weighted columns.
 export function CampaignTable({ campaigns, emptyMessage }: { campaigns: Campaign[]; emptyMessage: string }) {
   return (
     <div className="overflow-x-auto">
@@ -20,7 +23,7 @@ export function CampaignTable({ campaigns, emptyMessage }: { campaigns: Campaign
         <caption className="sr-only">{campaigns.length} campaigns.</caption>
         <thead className="bg-[#f5f7fb] text-xs text-[#405579]">
           <tr>
-            {["Brand", "Campaign", "Budget", "Creators", "Status", "Dates"].map((label) => (
+            {["Campaign", "Budget", "Creators", "Status", "Dates"].map((label) => (
               <th key={label} scope="col" className="whitespace-nowrap px-5 py-3 font-medium">{label}</th>
             ))}
             <th scope="col" className="px-3 py-3"><span className="sr-only">Details</span></th>
@@ -28,12 +31,14 @@ export function CampaignTable({ campaigns, emptyMessage }: { campaigns: Campaign
         </thead>
         <tbody>
           {campaigns.length === 0 && (
-            <tr><td colSpan={7} className="px-6 py-12 text-center text-[#53668e]">{emptyMessage}</td></tr>
+            <tr><td colSpan={6} className="px-6 py-12 text-center text-[#53668e]">{emptyMessage}</td></tr>
           )}
           {campaigns.map((campaign) => (
             <tr key={campaign.id} className="border-t border-[#edf1f8] hover:bg-[#f7f9fd]">
-              <td className="whitespace-nowrap px-5 py-4 font-medium">{campaign.brand}</td>
-              <td className="px-5 py-4">{campaign.title}</td>
+              <td className="px-5 py-4">
+                <p className="font-medium">{campaign.title}</p>
+                <p className="mt-0.5 text-xs text-[#53668e]">{campaign.brand}</p>
+              </td>
               <td className="whitespace-nowrap px-5 py-4">{formatBudget(campaign)}</td>
               {/* Creator assignment doesn't exist until M4 — always 0 until then. */}
               <td className="whitespace-nowrap px-5 py-4">{campaign.creatorCount ?? 0}</td>
