@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireCreator } from "@/lib/auth/account";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await requireCreator();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   const { id } = await params;
 

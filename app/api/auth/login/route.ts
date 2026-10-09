@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   const normalizedEmail = email.trim().toLowerCase();
   const supabase = getSupabaseAdmin();
-  const { data: user } = await supabase.from("app_users").select("id, email, password_hash").eq("email", normalizedEmail).maybeSingle();
+  const { data: user } = await supabase.from("app_users").select("id, email, password_hash, account_type").eq("email", normalizedEmail).maybeSingle();
 
   // Same generic message whether the email doesn't exist or the password is wrong, to avoid leaking which emails are registered.
   if (!user || !(await verifyPassword(password, user.password_hash))) {
@@ -22,5 +22,5 @@ export async function POST(request: Request) {
   }
 
   await createSession({ sub: user.id, email: user.email });
-  return NextResponse.json({ user: { id: user.id, email: user.email } });
+  return NextResponse.json({ user: { id: user.id, email: user.email, accountType: user.account_type } });
 }

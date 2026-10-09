@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireCreator } from "@/lib/auth/account";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isProfile, type Profile } from "@/lib/profile";
 
 export async function GET() {
-  const user = await getCurrentUser();
+  const user = await requireCreator();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
   const supabase = getSupabaseAdmin();
@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireCreator();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
   let updated: unknown;

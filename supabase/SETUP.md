@@ -47,3 +47,13 @@ Required `.env.local` additions (never prefix these with `NEXT_PUBLIC_`):
 - `AUTH_JWT_SECRET` — any long random string, used only to sign our session cookies.
 
 Signup is open to anyone with an email/password (8-200 chars); a session is created immediately on signup or login. Every brand-new account also gets an empty profile row created automatically.
+
+## Manager accounts and agency workspaces
+
+Every account now has an `account_type` of `creator` or `manager`, chosen at signup and immutable afterward. Creators keep using the app exactly as before (`deals`, `outreach`, `invoices`, `profile`, all scoped by `user_id`). Manager accounts instead belong to one or more `workspaces` (agencies) via `workspace_members`, with `owner`/`manager`/`member` roles. A creator account can never join a workspace, and a manager account can never own creator records — this is enforced both in application code and by a database trigger on `workspace_members`.
+
+Run these migrations in order after the earlier ones:
+- `202610090002_add_account_type.sql`
+- `202610090003_create_workspaces.sql`
+
+Signing up as a manager also creates the agency's first workspace (named during signup) and adds the new account as its `owner`.

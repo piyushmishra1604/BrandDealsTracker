@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireCreator } from "@/lib/auth/account";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const SAFE_ID = /^[a-zA-Z0-9-]{1,100}$/;
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireCreator();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
   let formData: FormData;

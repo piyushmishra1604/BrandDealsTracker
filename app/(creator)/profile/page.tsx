@@ -3,9 +3,9 @@
 import { Banknote, Plus, User } from "lucide-react";
 import { useState } from "react";
 import { type BankAccount, type Profile } from "@/lib/profile";
-import { FormSection } from "../components/form-section";
-import { CloudProfile } from "../components/cloud-profile";
-import { Sidebar } from "../components/sidebar";
+import { FormSection } from "../../components/form-section";
+import { CloudProfile } from "../../components/cloud-profile";
+import { Sidebar } from "../../components/sidebar";
 
 export default function ProfilePage() {
   return <CloudProfile>{(profile, saveProfile) => (

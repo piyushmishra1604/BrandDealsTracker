@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireCreator } from "@/lib/auth/account";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isOutreach, type Outreach } from "@/lib/outreach";
 
 export async function GET() {
-  const user = await getCurrentUser();
+  const user = await requireCreator();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
   const { data, error } = await getSupabaseAdmin().from("outreach").select("*").eq("user_id", user.sub).order("dateReachedOut", { ascending: false });
@@ -14,7 +14,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireCreator();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
   let item: unknown;

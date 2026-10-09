@@ -4,12 +4,12 @@ import { Fragment, useState } from "react";
 import { Plus } from "lucide-react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
 import { type Invoice, currencySymbols, invoiceTotal, invoiceFileName } from "@/lib/invoices";
-import { CloudDashboard } from "./components/cloud-dashboard";
-import { CloudInvoices } from "./components/cloud-invoices";
-import { CloudProfile } from "./components/cloud-profile";
-import { CreateInvoiceButton } from "./components/invoice-modal";
-import { Sidebar } from "./components/sidebar";
-import { ViewInvoiceButton } from "./components/view-invoice-modal";
+import { CloudDashboard } from "../components/cloud-dashboard";
+import { CloudInvoices } from "../components/cloud-invoices";
+import { CloudProfile } from "../components/cloud-profile";
+import { CreateInvoiceButton } from "../components/invoice-modal";
+import { Sidebar } from "../components/sidebar";
+import { ViewInvoiceButton } from "../components/view-invoice-modal";
 
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat("en-IN", {

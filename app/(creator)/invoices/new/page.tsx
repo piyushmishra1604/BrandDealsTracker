@@ -6,11 +6,11 @@ import { Suspense } from "react";
 import { type Deal } from "@/lib/deals";
 import { type Invoice } from "@/lib/invoices";
 import { type Profile } from "@/lib/profile";
-import { CloudDashboard } from "../../components/cloud-dashboard";
-import { CloudInvoices } from "../../components/cloud-invoices";
-import { CloudProfile } from "../../components/cloud-profile";
-import { InvoiceForm } from "../../components/invoice-form";
-import { Sidebar } from "../../components/sidebar";
+import { CloudDashboard } from "../../../components/cloud-dashboard";
+import { CloudInvoices } from "../../../components/cloud-invoices";
+import { CloudProfile } from "../../../components/cloud-profile";
+import { InvoiceForm } from "../../../components/invoice-form";
+import { Sidebar } from "../../../components/sidebar";
 
 export default function NewInvoicePage() {
   return <Suspense fallback={<p role="status" className="p-8">Loading…</p>}>

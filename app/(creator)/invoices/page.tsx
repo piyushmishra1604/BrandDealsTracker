@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { type Invoice, invoiceTotal, invoiceFileName, currencySymbols } from "@/lib/invoices";
-import { CloudInvoices } from "../components/cloud-invoices";
-import { Sidebar } from "../components/sidebar";
-import { ViewInvoiceButton } from "../components/view-invoice-modal";
+import { CloudInvoices } from "../../components/cloud-invoices";
+import { Sidebar } from "../../components/sidebar";
+import { ViewInvoiceButton } from "../../components/view-invoice-modal";
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("en-US", {

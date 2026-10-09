@@ -4,8 +4,8 @@ import { Fragment, useState } from "react";
 import { Plus } from "lucide-react";
 import { todayDate } from "@/lib/deals";
 import { type Outreach, type OutreachSource, type OutreachStatus, outreachSources, outreachStatuses, isOutreach } from "@/lib/outreach";
-import { CloudOutreach } from "../components/cloud-outreach";
-import { Sidebar } from "../components/sidebar";
+import { CloudOutreach } from "../../components/cloud-outreach";
+import { Sidebar } from "../../components/sidebar";
 
 const cardIcons = {
   brands: { color: "bg-[#e5edff] text-[#2869ff]", path: "M3 6h18v12H3V6Zm0 0 9 7 9-7" },
