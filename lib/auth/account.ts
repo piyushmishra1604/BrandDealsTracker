@@ -28,3 +28,14 @@ export async function requireManagerAccount(): Promise<SessionPayload | null> {
   if (!user) return null;
   return (await getAccountType(user.sub)) === "manager" ? user : null;
 }
+
+// There's no display-name field on app_users yet, so the top bar derives something
+// readable from the email local-part (e.g. "test-manager" -> "Test Manager").
+export function displayNameFromEmail(email: string): string {
+  const localPart = email.split("@")[0] ?? email;
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map(part => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}

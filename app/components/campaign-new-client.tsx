@@ -3,13 +3,12 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { type CampaignInput } from "@/lib/campaigns";
-import { CampaignForm } from "./campaign-form";
+import { type CampaignFormInput, CampaignForm } from "./campaign-form";
 
 export function CampaignNewClient({ workspaceId }: { workspaceId: string }) {
   const router = useRouter();
 
-  async function save(input: CampaignInput) {
+  async function save(input: CampaignFormInput) {
     try {
       const response = await fetch("/api/manager/campaigns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, ...input }) });
       const body = await response.json();
@@ -25,7 +24,7 @@ export function CampaignNewClient({ workspaceId }: { workspaceId: string }) {
         <ArrowLeft className="h-4 w-4" strokeWidth={2} /> Back to Campaigns
       </Link>
       <h1 className="mb-6 text-2xl font-bold tracking-tight sm:text-3xl">Create Campaign</h1>
-      <CampaignForm onSave={save} onCancel={() => router.push("/manager/campaigns")} />
+      <CampaignForm workspaceId={workspaceId} onSave={save} onCancel={() => router.push("/manager/campaigns")} />
     </div>
   );
 }

@@ -42,8 +42,8 @@ export function ManagerDashboardClient({ workspaceId, workspaceName }: { workspa
     <div>
       <div className="mb-9 flex flex-wrap items-start justify-between gap-4 sm:mb-10">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{workspaceName}</h1>
-          <p className="mt-1.5 text-sm text-[#53668e] sm:text-base">Here&rsquo;s your agency overview.</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
+          <p className="mt-1.5 text-sm text-[#53668e] sm:text-base">Here&rsquo;s {workspaceName}&rsquo;s agency overview.</p>
         </div>
         <Link href="/manager/campaigns/new" className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
           <Plus className="h-4 w-4" strokeWidth={2.4} /> Create Campaign

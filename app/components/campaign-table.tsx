@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Handshake } from "lucide-react";
 import { type Campaign } from "@/lib/campaigns";
 import { currencySymbols } from "@/lib/invoices";
 import { CampaignStatusBadge } from "./campaign-status-badge";
@@ -9,6 +10,18 @@ function formatDate(date: string) {
 
 function formatBudget(campaign: Pick<Campaign, "budget" | "currency">) {
   return `${currencySymbols[campaign.currency]}${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(campaign.budget)}`;
+}
+
+function CampaignThumbnail({ imageUrl }: { imageUrl?: string | null }) {
+  if (imageUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local asset
+    return <img src={imageUrl} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />;
+  }
+  return (
+    <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-50 to-accent-50 text-brand-300">
+      <Handshake className="h-5 w-5" strokeWidth={1.5} />
+    </span>
+  );
 }
 
 // Shared by the manager dashboard's "recent campaigns" panel (WP2.3) and the full
@@ -36,11 +49,16 @@ export function CampaignTable({ campaigns, emptyMessage }: { campaigns: Campaign
           {campaigns.map((campaign) => (
             <tr key={campaign.id} className="border-t border-[#edf1f8] hover:bg-[#f7f9fd]">
               <td className="px-5 py-4">
-                <p className="font-medium">{campaign.title}</p>
-                <p className="mt-0.5 text-xs text-[#53668e]">{campaign.brand}</p>
+                <div className="flex items-center gap-3">
+                  <CampaignThumbnail imageUrl={campaign.imageUrl} />
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{campaign.title}</p>
+                    <p className="mt-0.5 truncate text-xs text-[#53668e]">{campaign.brand}</p>
+                  </div>
+                </div>
               </td>
               <td className="whitespace-nowrap px-5 py-4">{formatBudget(campaign)}</td>
-              {/* Creator assignment doesn't exist until M4 — always 0 until then. */}
+              {/* Creator-to-campaign assignment doesn't exist until a later milestone — always 0 until then. */}
               <td className="whitespace-nowrap px-5 py-4">{campaign.creatorCount ?? 0}</td>
               <td className="whitespace-nowrap px-5 py-4"><CampaignStatusBadge status={campaign.status} /></td>
               <td className="whitespace-nowrap px-5 py-4 text-[#53668e]">{formatDate(campaign.startDate)} – {formatDate(campaign.endDate)}</td>

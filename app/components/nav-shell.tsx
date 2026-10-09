@@ -1,6 +1,7 @@
 "use client";
 
 import { type LucideIcon, LogOut, Handshake } from "lucide-react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,16 +9,24 @@ export type NavItem = { label: string; href: string | null; icon: LucideIcon; ti
 
 // Shared by the creator Sidebar and the manager nav shell so both portals look and
 // behave the same way without duplicating the markup/logic (WP1.6).
-export function NavShell({ brand, navigation }: { brand: string; navigation: NavItem[] }) {
+export function NavShell({ brand, subtitle, navigation, footerExtra }: {
+  brand: string;
+  subtitle?: string;
+  navigation: NavItem[];
+  footerExtra?: ReactNode;
+}) {
   const pathname = usePathname();
   return (
     <aside className="flex shrink-0 flex-col border-b border-[#edf1f8] bg-[#f7f9fd] px-4 py-5 md:w-52 md:border-r md:border-b-0 md:py-7 lg:w-56">
-      <p className="mb-5 flex items-center gap-2.5 px-3 text-xl font-bold tracking-tight md:mb-8">
-        <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-accent-600 text-white shadow-sm">
+      <div className="mb-5 flex items-center gap-2.5 px-3 md:mb-8">
+        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-accent-600 text-white shadow-sm">
           <Handshake className="h-4 w-4" strokeWidth={2.2} />
         </span>
-        {brand}
-      </p>
+        <span className="min-w-0">
+          <span className="block truncate text-xl font-bold leading-tight tracking-tight">{brand}</span>
+          {subtitle && <span className="block truncate text-xs font-normal leading-tight text-[#53668e]">{subtitle}</span>}
+        </span>
+      </div>
       <nav aria-label="Main navigation" className="flex gap-2 overflow-x-auto pb-1 md:flex-1 md:flex-col md:overflow-visible">
         {navigation.map(({ label, href, icon: Icon, tint }) => {
           const active = href !== null && (pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)));
@@ -30,6 +39,7 @@ export function NavShell({ brand, navigation }: { brand: string; navigation: Nav
           );
         })}
       </nav>
+      {footerExtra}
       <button type="button" onClick={() => void fetch("/api/auth/logout", { method: "POST" }).then(() => { window.location.reload(); })} className="mt-5 flex shrink-0 cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-[#405579] transition-colors hover:bg-brand-50 md:mt-3">
         <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-600"><LogOut className="h-4 w-4" strokeWidth={2} /></span>
         Sign Out

@@ -38,11 +38,9 @@ export function CloudCampaigns({ workspaceId, children }: {
         : await fetch("/api/manager/campaigns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, ...input }) });
       const body = await response.json();
       if (!response.ok) return body.error ?? "Could not save the campaign.";
-      setCampaigns(current => {
-        const withoutSaved = current.filter(entry => entry.id !== body.campaign.id);
-        // Archived campaigns drop out of the active list, same as the list API's own filter.
-        return body.campaign.status === "archived" ? withoutSaved : [body.campaign, ...withoutSaved];
-      });
+      // Archived campaigns stay in state (just like the list API now returns them) so
+      // the Archived status tab can show a campaign immediately after archiving it.
+      setCampaigns(current => [body.campaign, ...current.filter(entry => entry.id !== body.campaign.id)]);
       return null;
     } catch { return "Could not save to the server. Check your connection and try again."; }
   }
