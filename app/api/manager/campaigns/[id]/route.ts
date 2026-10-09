@@ -9,13 +9,15 @@ const NOT_FOUND = { error: "Campaign not found." } as const;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { data: campaign } = await getSupabaseAdmin().from("campaigns").select("*").eq("id", id).maybeSingle();
+  const supabase = getSupabaseAdmin();
+  const { data: campaign } = await supabase.from("campaigns").select("*").eq("id", id).maybeSingle();
   if (!campaign) return NextResponse.json(NOT_FOUND, { status: 404 });
 
   const access = await requireWorkspaceAccess(campaign.workspaceId);
   if (!access) return NextResponse.json(NOT_FOUND, { status: 404 });
 
-  return NextResponse.json({ campaign: campaign as Campaign });
+  const { count } = await supabase.from("campaign_creators").select("id", { count: "exact", head: true }).eq("campaignId", id);
+  return NextResponse.json({ campaign: { ...campaign, creatorCount: count ?? 0 } as Campaign });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

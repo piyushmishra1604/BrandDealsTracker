@@ -5,14 +5,22 @@ vi.mock("@/lib/auth/workspace", () => ({ requireWorkspaceAccess: (...args: unkno
 
 const mockInsert = vi.fn();
 const mockOrder = vi.fn();
-const supabaseChain = {
-  select: () => supabaseChain,
-  eq: () => supabaseChain,
-  neq: () => supabaseChain,
-  order: (...args: unknown[]) => mockOrder(...args),
-  insert: (...args: unknown[]) => mockInsert(...args),
-};
-vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({ from: () => supabaseChain }) }));
+const mockMemberships = vi.fn();
+vi.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: () => ({
+    from: (table: string) => {
+      if (table === "campaign_creators") return { select: () => ({ eq: () => mockMemberships() }) };
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        neq: () => chain,
+        order: (...args: unknown[]) => mockOrder(...args),
+        insert: (...args: unknown[]) => mockInsert(...args),
+      };
+      return chain;
+    },
+  }),
+}));
 
 const { GET, POST } = await import("./route");
 
@@ -21,7 +29,7 @@ function makeRequest(url: string, init?: RequestInit) {
 }
 
 describe("GET /api/manager/campaigns", () => {
-  beforeEach(() => { mockRequireWorkspaceAccess.mockReset(); mockOrder.mockReset(); });
+  beforeEach(() => { mockRequireWorkspaceAccess.mockReset(); mockOrder.mockReset(); mockMemberships.mockReset(); mockMemberships.mockResolvedValue({ data: [], error: null }); });
 
   it("rejects a request with no workspace access (cross-agency isolation)", async () => {
     mockRequireWorkspaceAccess.mockResolvedValue(null);
@@ -43,6 +51,16 @@ describe("GET /api/manager/campaigns", () => {
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.campaigns).toHaveLength(1);
+  });
+
+  it("tallies creator counts per campaign from campaign_creators memberships", async () => {
+    mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
+    mockOrder.mockResolvedValue({ data: [{ id: "c1", workspaceId: "workspace-a" }, { id: "c2", workspaceId: "workspace-a" }], error: null });
+    mockMemberships.mockResolvedValue({ data: [{ campaignId: "c1" }, { campaignId: "c1" }], error: null });
+    const response = await GET(makeRequest("http://localhost/api/manager/campaigns?workspaceId=workspace-a"));
+    const body = await response.json();
+    expect(body.campaigns.find((c: { id: string }) => c.id === "c1").creatorCount).toBe(2);
+    expect(body.campaigns.find((c: { id: string }) => c.id === "c2").creatorCount).toBe(0);
   });
 });
 

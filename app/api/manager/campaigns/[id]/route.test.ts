@@ -5,13 +5,21 @@ vi.mock("@/lib/auth/workspace", () => ({ requireWorkspaceAccess: (...args: unkno
 
 const mockMaybeSingle = vi.fn();
 const mockUpdate = vi.fn();
-const supabaseChain = {
-  select: () => supabaseChain,
-  eq: () => supabaseChain,
-  maybeSingle: () => mockMaybeSingle(),
-  update: (...args: unknown[]) => mockUpdate(...args),
-};
-vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({ from: () => supabaseChain }) }));
+const mockCreatorCountEq = vi.fn();
+vi.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: () => ({
+    from: (table: string) => {
+      if (table === "campaign_creators") return { select: () => ({ eq: () => mockCreatorCountEq() }) };
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        maybeSingle: () => mockMaybeSingle(),
+        update: (...args: unknown[]) => mockUpdate(...args),
+      };
+      return chain;
+    },
+  }),
+}));
 
 const { GET, PATCH } = await import("./route");
 
@@ -26,7 +34,7 @@ const existingCampaign = {
 };
 
 describe("GET /api/manager/campaigns/[id]", () => {
-  beforeEach(() => { mockMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); });
+  beforeEach(() => { mockMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); mockCreatorCountEq.mockReset(); mockCreatorCountEq.mockResolvedValue({ count: 0 }); });
 
   it("returns 404 (not 401/403) for a campaign that doesn't exist, to avoid confirming IDs", async () => {
     mockMaybeSingle.mockResolvedValue({ data: null });
@@ -41,13 +49,15 @@ describe("GET /api/manager/campaigns/[id]", () => {
     expect(response.status).toBe(404);
   });
 
-  it("returns the campaign for an authorized workspace member", async () => {
+  it("returns the campaign with its real creator count for an authorized workspace member", async () => {
     mockMaybeSingle.mockResolvedValue({ data: existingCampaign });
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
+    mockCreatorCountEq.mockResolvedValue({ count: 2 });
     const response = await GET(makeRequest(), { params });
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.campaign.id).toBe("c1");
+    expect(body.campaign.creatorCount).toBe(2);
   });
 });
 

@@ -8,11 +8,18 @@ export default async function CreatorDetailPage({ params }: { params: Promise<{ 
   await requireManagerWorkspace();
   const { id } = await params;
 
-  const { data: creator } = await getSupabaseAdmin().from("creators").select("*").eq("id", id).maybeSingle();
+  const supabase = getSupabaseAdmin();
+  const { data: creator } = await supabase.from("creators").select("*").eq("id", id).maybeSingle();
   if (!creator) notFound();
 
   const access = await requireWorkspaceAccess(creator.workspaceId);
   if (!access) notFound();
 
-  return <CreatorDetailClient creator={creator as Creator} />;
+  let linkedEmail: string | null = null;
+  if (creator.linkedUserId) {
+    const { data: account } = await supabase.from("app_users").select("email").eq("id", creator.linkedUserId).maybeSingle();
+    linkedEmail = account?.email ?? null;
+  }
+
+  return <CreatorDetailClient creator={creator as Creator} linkedEmail={linkedEmail} />;
 }

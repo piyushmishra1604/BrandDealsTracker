@@ -8,13 +8,20 @@ export async function GET(request: Request) {
   const access = await requireWorkspaceAccess(workspaceId);
   if (!access) return NextResponse.json({ error: "Not signed in, or you don't have access to this workspace." }, { status: 401 });
 
-  const { data, error } = await getSupabaseAdmin()
-    .from("campaigns")
-    .select("*")
-    .eq("workspaceId", workspaceId)
-    .order("created_at", { ascending: false });
+  const supabase = getSupabaseAdmin();
+  const [{ data, error }, { data: memberships, error: membershipsError }] = await Promise.all([
+    supabase.from("campaigns").select("*").eq("workspaceId", workspaceId).order("created_at", { ascending: false }),
+    supabase.from("campaign_creators").select("campaignId").eq("workspaceId", workspaceId),
+  ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ campaigns: data as Campaign[] });
+  if (membershipsError) return NextResponse.json({ error: membershipsError.message }, { status: 500 });
+
+  // The campaigns table has no creatorCount column — tally memberships per campaign
+  // here instead of storing a count that could drift out of sync with campaign_creators.
+  const counts = new Map<string, number>();
+  for (const { campaignId } of memberships ?? []) counts.set(campaignId, (counts.get(campaignId) ?? 0) + 1);
+  const campaigns = (data as Campaign[]).map(campaign => ({ ...campaign, creatorCount: counts.get(campaign.id) ?? 0 }));
+  return NextResponse.json({ campaigns });
 }
 
 export async function POST(request: Request) {

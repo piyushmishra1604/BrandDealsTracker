@@ -38,10 +38,12 @@ describe("GET /api/manager/dashboard", () => {
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
     mockTerminal
       .mockResolvedValueOnce({ count: 3, error: null })
-      .mockResolvedValueOnce({ count: 1, error: null });
+      .mockResolvedValueOnce({ count: 1, error: null })
+      .mockResolvedValueOnce({ count: 2, error: null });
     const response = await GET(makeRequest("http://localhost/api/manager/dashboard?workspaceId=workspace-a"));
     const body = await response.json();
     expect(body.metrics.totalCampaigns).toBe(3);
     expect(body.metrics.activeCampaigns).toBe(1);
+    expect(body.metrics.totalCreators).toBe(2);
   });
 });

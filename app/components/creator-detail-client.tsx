@@ -1,16 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, Phone, AtSign, Megaphone } from "lucide-react";
 import { type Creator, type CreatorInput } from "@/lib/creators";
+import { type CampaignCreatorEntry } from "@/lib/campaign-creators";
 import { CreatorStatusBadge } from "./creator-status-badge";
 import { CreatorForm } from "./creator-form";
+import { LinkAccountCard } from "./link-account-card";
+import { CampaignStatusBadge } from "./campaign-status-badge";
 
-export function CreatorDetailClient({ creator: initialCreator }: { creator: Creator }) {
+export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { creator: Creator; linkedEmail?: string | null }) {
   const [creator, setCreator] = useState(initialCreator);
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [campaignEntries, setCampaignEntries] = useState<CampaignCreatorEntry[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`/api/manager/creators/${creator.id}/campaigns`);
+        if (!response.ok) return;
+        const body = await response.json();
+        if (!cancelled) setCampaignEntries(body.entries ?? []);
+      } finally {
+        if (!cancelled) setLoadingCampaigns(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [creator.id]);
 
   async function save(input: CreatorInput) {
     try {
@@ -64,15 +84,35 @@ export function CreatorDetailClient({ creator: initialCreator }: { creator: Crea
             )}
           </section>
 
+          <LinkAccountCard creator={creator} linkedEmail={linkedEmail} onLinked={(updated) => { setCreator(updated); setNotice("Creator linked to their account."); }} />
+
           <section>
             <h2 className="mb-3 text-lg font-bold">Campaigns</h2>
-            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#d7e0f0] bg-[#f7f9fd] px-6 py-14 text-center">
-              <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                <Megaphone className="h-5 w-5" strokeWidth={2} />
-              </span>
-              <p className="text-sm font-semibold text-[#101c40]">Not assigned to any campaigns yet</p>
-              <p className="max-w-sm text-sm text-[#53668e]">Campaign and deal assignment for creators arrives in a later milestone.</p>
-            </div>
+            {loadingCampaigns ? (
+              <p className="text-sm text-[#53668e]">Loading campaigns…</p>
+            ) : campaignEntries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#d7e0f0] bg-[#f7f9fd] px-6 py-14 text-center">
+                <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <Megaphone className="h-5 w-5" strokeWidth={2} />
+                </span>
+                <p className="text-sm font-semibold text-[#101c40]">Not assigned to any campaigns yet</p>
+                <p className="max-w-sm text-sm text-[#53668e]">Add this creator to a campaign from the campaign&apos;s detail page.</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-[#e5ebf5] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
+                {campaignEntries.map((entry) => entry.campaign && (
+                  <li key={entry.id}>
+                    <Link href={`/manager/campaigns/${entry.campaign.id}`} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50">
+                      <div>
+                        <p className="text-sm font-semibold text-[#101c40]">{entry.campaign.title}</p>
+                        <p className="text-xs text-[#53668e]">{entry.campaign.brand}</p>
+                      </div>
+                      <CampaignStatusBadge status={entry.campaign.status as Parameters<typeof CampaignStatusBadge>[0]["status"]} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
       )}

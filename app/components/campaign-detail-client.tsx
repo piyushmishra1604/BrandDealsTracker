@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Handshake, CircleDollarSign, Calendar, Tag, UserPlus } from "lucide-react";
+import { ArrowLeft, Users, Handshake, CircleDollarSign, Calendar, Tag } from "lucide-react";
 import { type Campaign, type CampaignInput } from "@/lib/campaigns";
 import { currencySymbols } from "@/lib/invoices";
 import { CampaignStatusBadge } from "./campaign-status-badge";
 import { CampaignForm, type CampaignFormInput } from "./campaign-form";
+import { CampaignCreatorsPanel } from "./campaign-creators-panel";
 
 type Tab = "creatorsDeals" | "details" | "notes";
 const tabs: { id: Tab; label: string }[] = [
@@ -36,6 +37,7 @@ function StatCard({ icon: Icon, tint, label, value }: { icon: typeof Users; tint
 
 export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: Campaign }) {
   const [campaign, setCampaign] = useState(initialCampaign);
+  const [creatorCount, setCreatorCount] = useState(initialCampaign.creatorCount ?? 0);
   const [tab, setTab] = useState<Tab>("creatorsDeals");
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState("");
@@ -142,7 +144,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: 
       )}
 
       <section aria-label="Campaign metrics" className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard icon={Users} tint="bg-purple-50 text-purple-600" label="Creators" value={(campaign.creatorCount ?? 0).toString()} />
+        <StatCard icon={Users} tint="bg-purple-50 text-purple-600" label="Creators" value={creatorCount.toString()} />
         {/* Deals and Total Deal Value don't exist until M5/M7 — honestly 0 until then. */}
         <StatCard icon={Handshake} tint="bg-emerald-50 text-emerald-600" label="Deals" value="0" />
         <StatCard icon={CircleDollarSign} tint="bg-amber-50 text-amber-600" label="Total Deal Value" value={`${currencySymbols[campaign.currency]}0`} />
@@ -163,28 +165,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: 
       </nav>
 
       {tab === "creatorsDeals" && (
-        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
-          <div className="flex items-center justify-between gap-4 border-b border-[#e5ebf5] px-5 py-5">
-            <h2 className="text-lg font-bold">Creators &amp; Deals</h2>
-            <button type="button" disabled title="Creator-to-campaign assignment arrives in a later milestone" className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white opacity-50">
-              <UserPlus className="h-4 w-4" strokeWidth={2.4} /> Add Creator
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[#f5f7fb] text-xs text-[#405579]">
-                <tr>
-                  {["Creator", "Deal Amount", "Deliverables", "Due Date", "Status"].map((label) => (
-                    <th key={label} scope="col" className="whitespace-nowrap px-5 py-3 font-medium">{label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-[#53668e]">No creators assigned yet. Assigning creators and deals to a campaign arrives in a later milestone.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <CampaignCreatorsPanel campaignId={campaign.id} workspaceId={campaign.workspaceId} onCountChange={setCreatorCount} />
       )}
 
       {tab === "details" && (
