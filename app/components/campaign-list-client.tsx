@@ -26,12 +26,18 @@ export function CampaignListClient({ workspaceId }: { workspaceId: string }) {
       </div>
 
       <CloudCampaigns workspaceId={workspaceId}>
-        {(campaigns) => {
+        {(campaigns, _save, archive) => {
           const searchLower = search.trim().toLowerCase();
           const searched = campaigns.filter((campaign: Campaign) =>
             !searchLower || campaign.brand.toLowerCase().includes(searchLower) || campaign.title.toLowerCase().includes(searchLower));
           const filtered = tab === "all" ? searched : searched.filter(campaign => campaign.status === tab);
           const countFor = (status: TabFilter) => (status === "all" ? searched : searched.filter(c => c.status === status)).length;
+
+          async function handleArchive(campaign: Campaign) {
+            if (!window.confirm(`Archive the "${campaign.title}" campaign? It will no longer appear in your active campaign list.`)) return;
+            const error = await archive(campaign.id);
+            if (error) window.alert(error);
+          }
 
           return (
             <>
@@ -66,7 +72,7 @@ export function CampaignListClient({ workspaceId }: { workspaceId: string }) {
                 <div className="flex items-center justify-between gap-4 border-b border-[#e5ebf5] px-5 py-5">
                   <h2 id="campaigns-heading" className="text-lg font-bold">All Campaigns</h2>
                 </div>
-                <CampaignTable campaigns={filtered} emptyMessage={campaigns.length === 0 ? "No campaigns yet. Create your first campaign." : "No campaigns match this filter."} />
+                <CampaignTable campaigns={filtered} emptyMessage={campaigns.length === 0 ? "No campaigns yet. Create your first campaign." : "No campaigns match this filter."} onArchive={(campaign) => void handleArchive(campaign)} />
               </section>
             </>
           );

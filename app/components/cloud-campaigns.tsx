@@ -8,6 +8,7 @@ export function CloudCampaigns({ workspaceId, children }: {
   children: (
     campaigns: Campaign[],
     save: (input: CampaignInput, id?: string) => Promise<string | null>,
+    archive: (id: string) => Promise<string | null>,
   ) => ReactNode;
 }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -45,9 +46,20 @@ export function CloudCampaigns({ workspaceId, children }: {
     } catch { return "Could not save to the server. Check your connection and try again."; }
   }
 
+  // Quick archive action from the list row, without opening the full edit form.
+  async function archive(id: string) {
+    try {
+      const response = await fetch(`/api/manager/campaigns/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "archived" }) });
+      const body = await response.json();
+      if (!response.ok) return body.error ?? "Could not archive the campaign.";
+      setCampaigns(current => [body.campaign, ...current.filter(entry => entry.id !== body.campaign.id)]);
+      return null;
+    } catch { return "Could not save to the server. Check your connection and try again."; }
+  }
+
   const button = "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50";
   return <>
     {error && <div role="alert" className="p-6 text-red-700">{error} <button className={button} onClick={() => setRetry(value => value + 1)}>Retry loading</button></div>}
-    {loaded ? children(campaigns, save) : !error && <p role="status" className="p-8">Loading campaigns…</p>}
+    {loaded ? children(campaigns, save, archive) : !error && <p role="status" className="p-8">Loading campaigns…</p>}
   </>;
 }

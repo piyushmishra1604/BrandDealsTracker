@@ -63,7 +63,7 @@ export function ManagerDashboardClient({ workspaceId, workspaceName }: { workspa
           <Link href="/manager/campaigns" className="shrink-0 text-sm font-medium text-brand-600 hover:underline">View all →</Link>
         </div>
         <CloudCampaigns workspaceId={workspaceId}>
-          {(campaigns) => <CampaignTable campaigns={campaigns.slice(0, 5)} emptyMessage="No campaigns yet. Create your first campaign to get started." />}
+          {(campaigns, _save, archive) => <CampaignTable campaigns={campaigns.slice(0, 5)} emptyMessage="No campaigns yet. Create your first campaign to get started." onArchive={(campaign) => { if (window.confirm(`Archive the "${campaign.title}" campaign?`)) void archive(campaign.id); }} />}
         </CloudCampaigns>
       </section>
     </div>
