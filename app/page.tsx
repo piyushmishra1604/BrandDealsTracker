@@ -6,6 +6,7 @@ import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, to
 import { type Invoice, currencySymbols, invoiceTotal, invoiceFileName } from "@/lib/invoices";
 import { CloudDashboard } from "./components/cloud-dashboard";
 import { CloudInvoices } from "./components/cloud-invoices";
+import { CloudProfile } from "./components/cloud-profile";
 import { CreateInvoiceButton } from "./components/invoice-modal";
 import { Sidebar } from "./components/sidebar";
 import { ViewInvoiceButton } from "./components/view-invoice-modal";
@@ -27,12 +28,14 @@ const formatMonth = (month: string, style: "short" | "long") =>
 export default function Home() {
   return <CloudDashboard>{(deals, persistDeal, removeDeal) => (
     <CloudInvoices>{(invoices) => (
-      <Dashboard deals={deals} persistDeal={persistDeal} removeDeal={removeDeal} invoices={invoices} />
+      <CloudProfile>{(profile) => (
+        <Dashboard deals={deals} persistDeal={persistDeal} removeDeal={removeDeal} invoices={invoices} senderName={profile.senderName} />
+      )}</CloudProfile>
     )}</CloudInvoices>
   )}</CloudDashboard>;
 }
 
-function Dashboard({ deals, persistDeal, removeDeal, invoices }: { deals: Deal[]; persistDeal: (deal: Deal) => Promise<string | null>; removeDeal: (id: string) => Promise<string | null>; invoices: Invoice[] }) {
+function Dashboard({ deals, persistDeal, removeDeal, invoices, senderName }: { deals: Deal[]; persistDeal: (deal: Deal) => Promise<string | null>; removeDeal: (id: string) => Promise<string | null>; invoices: Invoice[]; senderName: string }) {
   const [notice, setNotice] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   async function deleteDeal(deal: Deal) {
@@ -121,7 +124,7 @@ function Dashboard({ deals, persistDeal, removeDeal, invoices }: { deals: Deal[]
         <div className="mb-9 flex flex-wrap items-start justify-between gap-4 sm:mb-10">
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Hi, Piyush <span aria-hidden="true">👋</span>
+              Hi{senderName ? `, ${senderName.split(" ")[0]}` : ""} <span aria-hidden="true">👋</span>
             </h1>
             <p className="mt-1.5 text-sm text-[#53668e] sm:text-base">
               Here’s your brand deal overview.
