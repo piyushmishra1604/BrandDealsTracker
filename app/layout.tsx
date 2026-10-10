@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BrandTracker",
+  title: "CollabFlow",
   description: "Track your brand collaborations, content deadlines, and payments.",
 };
 

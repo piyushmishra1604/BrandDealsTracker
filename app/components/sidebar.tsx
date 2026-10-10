@@ -12,5 +12,5 @@ const navigation: NavItem[] = [
 ];
 
 export function Sidebar() {
-  return <NavShell brand="BrandTracker" navigation={navigation} />;
+  return <NavShell brand="CollabFlow" navigation={navigation} />;
 }

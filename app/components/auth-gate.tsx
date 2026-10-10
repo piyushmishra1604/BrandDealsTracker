@@ -65,7 +65,7 @@ function LoginScreen({ onSignedIn }: { onSignedIn: (user: CurrentUser) => void }
     finally { setSubmitting(false); }
   }
 
-  const titles: Record<Mode, string> = { login: "Sign in to BrandTracker", signup: "Create your account" };
+  const titles: Record<Mode, string> = { login: "Sign in to CollabFlow", signup: "Create your account" };
   const submitLabels: Record<Mode, string> = { login: "Sign in", signup: "Create account" };
 
   return (
