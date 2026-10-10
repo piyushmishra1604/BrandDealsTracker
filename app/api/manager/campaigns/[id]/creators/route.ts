@@ -19,13 +19,26 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const authorized = await getAuthorizedCampaign(id);
   if (!authorized) return NextResponse.json(CAMPAIGN_NOT_FOUND, { status: 404 });
 
-  const { data, error } = await authorized.supabase
-    .from("campaign_creators")
-    .select("*, creator:creators(id, name, instagramHandle, category, status)")
-    .eq("campaignId", id)
-    .order("created_at", { ascending: true });
+  const [{ data, error }, { data: deals, error: dealsError }] = await Promise.all([
+    authorized.supabase
+      .from("campaign_creators")
+      .select("*, creator:creators(id, name, instagramHandle, category, status, linkedUserId)")
+      .eq("campaignId", id)
+      .order("created_at", { ascending: true }),
+    // Deals have no FK to campaign_creators (they key off the creator's real account id,
+    // not the directory contact id), so the per-creator deal is matched up in JS below
+    // instead of a single PostgREST embed.
+    authorized.supabase.from("deals").select("*").eq("campaignId", id),
+  ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ entries: data as CampaignCreatorEntry[] });
+  if (dealsError) return NextResponse.json({ error: dealsError.message }, { status: 500 });
+
+  const dealsByUserId = new Map((deals ?? []).map(deal => [deal.user_id, deal]));
+  const entries = (data as CampaignCreatorEntry[]).map(entry => ({
+    ...entry,
+    deal: entry.creator?.linkedUserId ? (dealsByUserId.get(entry.creator.linkedUserId) ?? null) : null,
+  }));
+  return NextResponse.json({ entries });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -46,11 +59,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { data, error } = await authorized.supabase
     .from("campaign_creators")
     .insert({ campaignId: id, creatorId, workspaceId: authorized.campaign.workspaceId, addedBy: authorized.access.sub })
-    .select("*, creator:creators(id, name, instagramHandle, category, status)")
+    .select("*, creator:creators(id, name, instagramHandle, category, status, linkedUserId)")
     .single();
   if (error) {
     if (error.code === "23505") return NextResponse.json({ error: "This creator is already on the campaign." }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ entry: data as CampaignCreatorEntry });
+  return NextResponse.json({ entry: { ...data, deal: null } as CampaignCreatorEntry });
 }

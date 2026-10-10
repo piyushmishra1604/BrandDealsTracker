@@ -12,6 +12,14 @@ export function isDeliverables(value: unknown): value is Deliverable[] {
   );
 }
 
+// Only set when a manager assigned this deal from a campaign (M5) — "pending" until the
+// creator accepts or declines it; absent entirely for deals a creator created themselves.
+export type AcceptanceStatus = "pending" | "accepted" | "declined";
+
+export function isAcceptanceStatus(value: unknown): value is AcceptanceStatus {
+  return value === "pending" || value === "accepted" || value === "declined";
+}
+
 export type Deal = {
   id: string;
   brand: string;
@@ -30,6 +38,10 @@ export type Deal = {
   sentToBrand: boolean;
   posted: boolean;
   moneyReceived: boolean;
+  workspaceId?: string | null;
+  campaignId?: string | null;
+  assignedByUserId?: string | null;
+  acceptanceStatus?: AcceptanceStatus | null;
 };
 
 export function isDate(value: unknown): value is string {
@@ -74,5 +86,29 @@ export function todayDate(now = new Date()): string {
 export function dealDateError(deal: Deal, today = todayDate()): string | null {
   if (deal.dealDate > today) return "Deal date cannot be in the future. Choose today or an earlier date.";
   if (deal.dueDate < deal.dealDate) return "Content due date must be on or after the deal date.";
+  return null;
+}
+
+// What a manager actually fills in when assigning a deal (M5): the deal date is always
+// "today" (the day the manager created the assignment), and the brand always matches the
+// campaign's brand — neither is a free-form field here, unlike the creator's own deal form.
+export type AssignedDealInput = {
+  amount: number;
+  dueDate: string;
+  deliverables?: Deliverable[];
+  notes?: string;
+};
+
+export function isAssignedDealInput(value: unknown): value is AssignedDealInput {
+  if (!value || typeof value !== "object") return false;
+  const input = value as AssignedDealInput;
+  return typeof input.amount === "number" && Number.isFinite(input.amount) && input.amount >= 0
+    && isDate(input.dueDate)
+    && (input.deliverables === undefined || isDeliverables(input.deliverables))
+    && (input.notes === undefined || (typeof input.notes === "string" && input.notes.length <= 5000));
+}
+
+export function assignedDealDateError(input: AssignedDealInput, today = todayDate()): string | null {
+  if (input.dueDate < today) return "Due date must be on or after today.";
   return null;
 }

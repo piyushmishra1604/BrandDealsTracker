@@ -7,12 +7,14 @@ const mockCampaignMaybeSingle = vi.fn();
 const mockCreatorMaybeSingle = vi.fn();
 const mockEntriesOrder = vi.fn();
 const mockInsertSingle = vi.fn();
+const mockDealsEq = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => ({
     from: (table: string) => {
       if (table === "campaigns") return { select: () => ({ eq: () => ({ maybeSingle: () => mockCampaignMaybeSingle() }) }) };
       if (table === "creators") return { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => mockCreatorMaybeSingle() }) }) }) };
+      if (table === "deals") return { select: () => ({ eq: () => mockDealsEq() }) };
       return {
         select: () => ({ eq: () => ({ order: () => mockEntriesOrder() }) }),
         insert: () => ({ select: () => ({ single: () => mockInsertSingle() }) }),
@@ -29,7 +31,7 @@ const params = Promise.resolve({ id: "camp-1" });
 const existingCampaign = { id: "camp-1", workspaceId: "workspace-a" };
 
 describe("GET /api/manager/campaigns/[id]/creators", () => {
-  beforeEach(() => { mockCampaignMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); mockEntriesOrder.mockReset(); });
+  beforeEach(() => { mockCampaignMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); mockEntriesOrder.mockReset(); mockDealsEq.mockReset(); mockDealsEq.mockResolvedValue({ data: [], error: null }); });
 
   it("returns 404 for a campaign that doesn't exist", async () => {
     mockCampaignMaybeSingle.mockResolvedValue({ data: null });
@@ -47,11 +49,31 @@ describe("GET /api/manager/campaigns/[id]/creators", () => {
   it("returns the campaign's assigned creators for an authorized workspace member", async () => {
     mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
-    mockEntriesOrder.mockResolvedValue({ data: [{ id: "cc-1", campaignId: "camp-1", creatorId: "c1" }], error: null });
+    mockEntriesOrder.mockResolvedValue({ data: [{ id: "cc-1", campaignId: "camp-1", creatorId: "c1", creator: { id: "c1", linkedUserId: null } }], error: null });
     const response = await GET(makeGetRequest(), { params });
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.entries).toHaveLength(1);
+  });
+
+  it("attaches the matching assigned deal for a linked creator", async () => {
+    mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
+    mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
+    mockEntriesOrder.mockResolvedValue({ data: [{ id: "cc-1", campaignId: "camp-1", creatorId: "c1", creator: { id: "c1", linkedUserId: "user-9" } }], error: null });
+    mockDealsEq.mockResolvedValue({ data: [{ id: "deal-1", user_id: "user-9", campaignId: "camp-1", amount: 500 }], error: null });
+    const response = await GET(makeGetRequest(), { params });
+    const body = await response.json();
+    expect(body.entries[0].deal).toEqual({ id: "deal-1", user_id: "user-9", campaignId: "camp-1", amount: 500 });
+  });
+
+  it("leaves deal null for a creator who isn't linked, even if deals exist on the campaign", async () => {
+    mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
+    mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
+    mockEntriesOrder.mockResolvedValue({ data: [{ id: "cc-1", campaignId: "camp-1", creatorId: "c1", creator: { id: "c1", linkedUserId: null } }], error: null });
+    mockDealsEq.mockResolvedValue({ data: [{ id: "deal-1", user_id: "user-9", campaignId: "camp-1", amount: 500 }], error: null });
+    const response = await GET(makeGetRequest(), { params });
+    const body = await response.json();
+    expect(body.entries[0].deal).toBeNull();
   });
 });
 

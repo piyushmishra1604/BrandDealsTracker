@@ -38,6 +38,8 @@ function StatCard({ icon: Icon, tint, label, value }: { icon: typeof Users; tint
 export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: Campaign }) {
   const [campaign, setCampaign] = useState(initialCampaign);
   const [creatorCount, setCreatorCount] = useState(initialCampaign.creatorCount ?? 0);
+  const [dealsCount, setDealsCount] = useState(0);
+  const [totalDealValue, setTotalDealValue] = useState(0);
   const [tab, setTab] = useState<Tab>("creatorsDeals");
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState("");
@@ -145,9 +147,8 @@ export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: 
 
       <section aria-label="Campaign metrics" className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard icon={Users} tint="bg-purple-50 text-purple-600" label="Creators" value={creatorCount.toString()} />
-        {/* Deals and Total Deal Value don't exist until M5/M7 — honestly 0 until then. */}
-        <StatCard icon={Handshake} tint="bg-emerald-50 text-emerald-600" label="Deals" value="0" />
-        <StatCard icon={CircleDollarSign} tint="bg-amber-50 text-amber-600" label="Total Deal Value" value={`${currencySymbols[campaign.currency]}0`} />
+        <StatCard icon={Handshake} tint="bg-emerald-50 text-emerald-600" label="Deals" value={dealsCount.toString()} />
+        <StatCard icon={CircleDollarSign} tint="bg-amber-50 text-amber-600" label="Total Deal Value" value={`${currencySymbols[campaign.currency]}${totalDealValue.toLocaleString()}`} />
       </section>
 
       <nav aria-label="Campaign sections" className="mb-7 flex gap-1 overflow-x-auto border-b border-[#edf1f8]">
@@ -165,7 +166,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: 
       </nav>
 
       {tab === "creatorsDeals" && (
-        <CampaignCreatorsPanel campaignId={campaign.id} workspaceId={campaign.workspaceId} onCountChange={setCreatorCount} />
+        <CampaignCreatorsPanel campaignId={campaign.id} workspaceId={campaign.workspaceId} currency={campaign.currency} onCountChange={setCreatorCount} onDealsChange={(count, value) => { setDealsCount(count); setTotalDealValue(value); }} />
       )}
 
       {tab === "details" && (
