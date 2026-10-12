@@ -57,7 +57,7 @@ export function LinkAccountCard({ creator, linkedEmail, onLinked }: { creator: C
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
       <h2 className="flex items-center gap-2 text-base font-bold"><Link2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />Link to account</h2>
-      <p className="mt-1 text-sm text-[#53668e]">This creator isn&rsquo;t linked to a registered account yet. Enter their registered email to link them — invitations are coming in a later milestone.</p>
+      <p className="mt-1 text-sm text-[#53668e]">This creator isn&rsquo;t linked to a registered account yet. Link them now by entering their registered email, or send an invitation link below.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setFound(null); }} placeholder="creator@example.com" className={`${inputClass} max-w-xs`} />
         <button type="button" onClick={() => void lookup()} disabled={looking || !email} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">

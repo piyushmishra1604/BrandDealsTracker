@@ -8,6 +8,7 @@ import { CreatorStatusBadge } from "./creator-status-badge";
 import { CreatorRelationshipBadge } from "./creator-relationship-badge";
 import { CreatorForm } from "./creator-form";
 import { LinkAccountCard } from "./link-account-card";
+import { CreatorInvitationCard } from "./creator-invitation-card";
 import { CreatorDealDashboard } from "./creator-deal-dashboard";
 
 export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { creator: Creator; linkedEmail?: string | null }) {
@@ -123,6 +124,8 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
           </section>
 
           <LinkAccountCard creator={creator} linkedEmail={linkedEmail} onLinked={(updated) => { setCreator(updated); setNotice("Creator linked to their account."); }} />
+
+          <CreatorInvitationCard creator={creator} />
 
           <CreatorDealDashboard creatorId={creator.id} />
         </div>

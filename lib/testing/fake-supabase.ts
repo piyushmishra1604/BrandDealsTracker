@@ -6,6 +6,7 @@ export type FakeQuery = {
   op: "select" | "insert" | "update" | "upsert" | "delete";
   payload?: Record<string, unknown>;
   filters: Record<string, unknown>;
+  notEquals: Record<string, unknown>;
   isNull: string[];
 };
 
@@ -25,11 +26,12 @@ export function createFakeSupabase(handler: FakeHandler, rpcHandler: FakeRpcHand
     queries,
     rpcCalls,
     from(table: string) {
-      const query: FakeQuery = { table, op: "select", filters: {}, isNull: [] };
+      const query: FakeQuery = { table, op: "select", filters: {}, notEquals: {}, isNull: [] };
       const builder = {
         select: () => builder,
         order: () => builder,
         eq(column: string, value: unknown) { query.filters[column] = value; return builder; },
+        neq(column: string, value: unknown) { query.notEquals[column] = value; return builder; },
         is(column: string) { query.isNull.push(column); return builder; },
         insert(payload: Record<string, unknown>) { query.op = "insert"; query.payload = payload; return builder; },
         update(payload: Record<string, unknown>) { query.op = "update"; query.payload = payload; return builder; },
