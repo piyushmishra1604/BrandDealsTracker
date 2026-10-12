@@ -13,7 +13,7 @@ const navigation: NavItem[] = [
   { label: "Invoices", href: null, icon: FileText, tint: "text-amber-600 bg-amber-50" },
   { label: "Analytics", href: null, icon: BarChart3, tint: "text-cyan-600 bg-cyan-50" },
   { label: "Team", href: null, icon: UsersRound, tint: "text-indigo-600 bg-indigo-50" },
-  { label: "Settings", href: null, icon: Settings, tint: "text-orange-600 bg-orange-50" },
+  { label: "Settings", href: "/manager/settings", icon: Settings, tint: "text-orange-600 bg-orange-50" },
 ];
 
 export function ManagerSidebar({ workspaceName }: { workspaceName: string }) {

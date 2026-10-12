@@ -5,6 +5,7 @@ import { useState } from "react";
 import { type BankAccount, type Profile } from "@/lib/profile";
 import { FormSection } from "../../components/form-section";
 import { CloudProfile } from "../../components/cloud-profile";
+import { UsernameField } from "../../components/username-field";
 import { Sidebar } from "../../components/sidebar";
 
 export default function ProfilePage() {
@@ -86,6 +87,8 @@ function ProfileForm({ profile, saveProfile }: {
         </div>
 
         <div className="max-w-2xl space-y-6">
+          <UsernameField />
+
           <FormSection step={1} icon={User} title="Your Details" description="Shown as the “From” details on every invoice.">
             <div className="grid gap-4">
               <label className="text-xs text-[#405579]">Brand Name
