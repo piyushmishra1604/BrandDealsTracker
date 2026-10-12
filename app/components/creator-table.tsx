@@ -3,8 +3,9 @@
 import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AtSign, Mail, Phone, Tag } from "lucide-react";
-import { type Creator, type CreatorStatus } from "@/lib/creators";
+import { type CreatorStatus, type CreatorSummary } from "@/lib/creators";
 import { CreatorStatusBadge } from "./creator-status-badge";
+import { CreatorRelationshipBadge } from "./creator-relationship-badge";
 
 // Same corner-flag treatment as the campaign and creator-dashboard deal rows.
 const cornerColors: Record<CreatorStatus, string> = {
@@ -22,10 +23,11 @@ function StatusCorner({ status }: { status: CreatorStatus }) {
   );
 }
 
-function CreatorActions({ creator }: { creator: Creator }) {
+function CreatorActions({ creator, onSetArchived }: { creator: CreatorSummary; onSetArchived: (creator: CreatorSummary) => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const menuItem = "w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-[#101c40] hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-600";
   return (
     <>
       <button
@@ -48,9 +50,12 @@ function CreatorActions({ creator }: { creator: Creator }) {
       </button>
       {open && <>
         <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default" />
-        <div aria-label={`Actions for ${creator.name}`} style={position} className="fixed z-50 m-0 w-32 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-          <button type="button" onClick={() => { setOpen(false); router.push(`/manager/creators/${creator.id}`); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-[#101c40] hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-600">
+        <div aria-label={`Actions for ${creator.name}`} style={position} className="fixed z-50 m-0 w-40 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+          <button type="button" onClick={() => { setOpen(false); router.push(`/manager/creators/${creator.id}`); }} className={menuItem}>
             View Profile
+          </button>
+          <button type="button" onClick={() => { setOpen(false); onSetArchived(creator); }} className={menuItem}>
+            {creator.archivedAt ? "Restore" : "Archive"}
           </button>
         </div>
       </>}
@@ -58,7 +63,7 @@ function CreatorActions({ creator }: { creator: Creator }) {
   );
 }
 
-function CreatorDetails({ creator }: { creator: Creator }) {
+function CreatorDetails({ creator }: { creator: CreatorSummary }) {
   return (
     <dl className="grid gap-4 sm:grid-cols-3">
       <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Mail className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Email</dt><dd className="mt-1 text-sm font-medium">{creator.email || "—"}</dd></div>
@@ -69,18 +74,33 @@ function CreatorDetails({ creator }: { creator: Creator }) {
   );
 }
 
+const columnLabels = ["Name", "Contact", "Instagram", "Category", "Relationship", "Status", "Campaigns", "Deals"];
+
 // Shared shape for the creator directory list (WP4.3). Mirrors the creator dashboard's
 // deal rows: a kebab menu instead of a plain link, and a click-to-expand inline tray
 // instead of navigating away immediately.
-export function CreatorTable({ creators, emptyMessage }: { creators: Creator[]; emptyMessage: string }) {
+export function CreatorTable({ creators, emptyMessage, onSetArchived }: {
+  creators: CreatorSummary[];
+  emptyMessage: string;
+  onSetArchived: (id: string, archived: boolean) => Promise<string | null>;
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
+
+  async function toggleArchived(creator: CreatorSummary) {
+    setActionError("");
+    const error = await onSetArchived(creator.id, !creator.archivedAt);
+    if (error) setActionError(error);
+  }
+
   return (
     <div className="overflow-x-auto">
+      {actionError && <p role="alert" className="px-5 pt-4 text-sm text-red-700">{actionError}</p>}
       <table className="w-full text-left text-sm">
         <caption className="sr-only">{creators.length} creators.</caption>
         <thead className="bg-[#f5f7fb] text-xs text-[#405579]">
           <tr>
-            {["Name", "Contact", "Instagram", "Category", "Status"].map((label) => (
+            {columnLabels.map((label) => (
               <th key={label} scope="col" className="whitespace-nowrap px-5 py-3 font-medium">{label}</th>
             ))}
             <th scope="col" className="px-3 py-3"><span className="sr-only">Actions</span></th>
@@ -88,7 +108,7 @@ export function CreatorTable({ creators, emptyMessage }: { creators: Creator[]; 
         </thead>
         <tbody>
           {creators.length === 0 && (
-            <tr><td colSpan={6} className="px-6 py-12 text-center text-[#53668e]">{emptyMessage}</td></tr>
+            <tr><td colSpan={columnLabels.length + 1} className="px-6 py-12 text-center text-[#53668e]">{emptyMessage}</td></tr>
           )}
           {creators.map((creator) => (
             <Fragment key={creator.id}>
@@ -97,7 +117,7 @@ export function CreatorTable({ creators, emptyMessage }: { creators: Creator[]; 
                   if ((event.target as HTMLElement).closest("button, a, [popover]")) return;
                   setExpandedId(expandedId === creator.id ? null : creator.id);
                 }}
-                className={`cursor-pointer border-t border-[#edf1f8] hover:bg-[#fafbfe] ${expandedId === creator.id ? "bg-[#f8faff]" : ""}`}
+                className={`cursor-pointer border-t border-[#edf1f8] hover:bg-[#fafbfe] ${expandedId === creator.id ? "bg-[#f8faff]" : ""} ${creator.archivedAt ? "opacity-60" : ""}`}
               >
                 <td className="relative whitespace-nowrap px-5 py-4 font-medium">
                   <StatusCorner status={creator.status} />
@@ -105,19 +125,23 @@ export function CreatorTable({ creators, emptyMessage }: { creators: Creator[]; 
                     <span aria-hidden="true">{expandedId === creator.id ? "▾" : "▸"}</span>
                   </button>
                   {creator.name}
+                  {creator.archivedAt && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Archived</span>}
                 </td>
                 <td className="px-5 py-4 text-[#53668e]">{creator.email || creator.phone || "—"}</td>
                 <td className="whitespace-nowrap px-5 py-4 text-[#53668e]">
                   {creator.instagramHandle ? <span className="inline-flex items-center gap-1"><AtSign className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />{creator.instagramHandle}</span> : "—"}
                 </td>
                 <td className="whitespace-nowrap px-5 py-4 text-[#53668e]">{creator.category || "—"}</td>
+                <td className="whitespace-nowrap px-5 py-4"><CreatorRelationshipBadge relationship={creator.relationship} /></td>
                 <td className="whitespace-nowrap px-5 py-4"><CreatorStatusBadge status={creator.status} /></td>
+                <td className="whitespace-nowrap px-5 py-4 tabular-nums text-[#53668e]">{creator.campaignCount ?? 0}</td>
+                <td className="whitespace-nowrap px-5 py-4 tabular-nums text-[#53668e]">{creator.dealCount ?? 0}</td>
                 <td className="px-3 py-2">
-                  <CreatorActions creator={creator} />
+                  <CreatorActions creator={creator} onSetArchived={toggleArchived} />
                 </td>
               </tr>
               <tr id={`creator-details-${creator.id}`} hidden={expandedId !== creator.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
-                <td colSpan={6} className="px-6 py-5">
+                <td colSpan={columnLabels.length + 1} className="px-6 py-5">
                   {expandedId === creator.id && <CreatorDetails creator={creator} />}
                 </td>
               </tr>

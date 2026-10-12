@@ -5,6 +5,14 @@ export const creatorStatusLabels: Record<CreatorStatus, string> = {
   linked: "Linked",
 };
 
+// "external" creators are contacts kept for future campaigns. "managed" creators are
+// linked to a CollabFlow account and show up in Creator Management (M4).
+export type CreatorRelationship = "external" | "managed";
+export const creatorRelationshipLabels: Record<CreatorRelationship, string> = {
+  external: "External",
+  managed: "Managed",
+};
+
 export type Creator = {
   id: string;
   workspaceId: string;
@@ -15,11 +23,16 @@ export type Creator = {
   category?: string | null;
   notes?: string | null;
   status: CreatorStatus;
+  relationship: CreatorRelationship;
+  archivedAt?: string | null;
   linkedUserId?: string | null;
   createdBy?: string | null;
   created_at?: string;
   updated_at?: string;
 };
+
+// Directory list rows carry counts so the table can show them without extra requests.
+export type CreatorSummary = Creator & { campaignCount?: number; dealCount?: number };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

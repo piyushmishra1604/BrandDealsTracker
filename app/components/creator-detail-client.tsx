@@ -6,6 +6,7 @@ import { ArrowLeft, Mail, Phone, AtSign, Megaphone } from "lucide-react";
 import { type Creator, type CreatorInput } from "@/lib/creators";
 import { type CampaignCreatorEntry } from "@/lib/campaign-creators";
 import { CreatorStatusBadge } from "./creator-status-badge";
+import { CreatorRelationshipBadge } from "./creator-relationship-badge";
 import { CreatorForm } from "./creator-form";
 import { LinkAccountCard } from "./link-account-card";
 import { CampaignStatusBadge } from "./campaign-status-badge";
@@ -32,6 +33,17 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
     return () => { cancelled = true; };
   }, [creator.id]);
 
+  async function setArchived(archived: boolean) {
+    setNotice("");
+    try {
+      const response = await fetch(`/api/manager/creators/${creator.id}/archive`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ archived }) });
+      const body = await response.json();
+      if (!response.ok) { setNotice(body.error ?? "Could not update the creator."); return; }
+      setCreator(body.creator);
+      setNotice(archived ? "Creator archived. They are hidden from new assignments." : "Creator restored.");
+    } catch { setNotice("Could not reach the server. Check your connection and try again."); }
+  }
+
   async function save(input: CreatorInput) {
     try {
       const response = await fetch(`/api/manager/creators/${creator.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
@@ -54,7 +66,14 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{creator.name}</h1>
           <CreatorStatusBadge status={creator.status} />
+          <CreatorRelationshipBadge relationship={creator.relationship} />
+          {creator.archivedAt && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Archived</span>}
         </div>
+        {!editing && (
+          <button type="button" onClick={() => setArchived(!creator.archivedAt)} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">
+            {creator.archivedAt ? "Restore creator" : "Archive creator"}
+          </button>
+        )}
       </div>
 
       {notice && <p role="status" className="mb-4 text-sm text-[#53668e]">{notice}</p>}

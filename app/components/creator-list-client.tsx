@@ -8,6 +8,7 @@ import { CreatorTable } from "./creator-table";
 
 export function CreatorListClient({ workspaceId }: { workspaceId: string }) {
   const [search, setSearch] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   return (
     <div>
@@ -21,16 +22,20 @@ export function CreatorListClient({ workspaceId }: { workspaceId: string }) {
         </Link>
       </div>
 
-      <section aria-label="Search creators" className="mb-7">
+      <section aria-label="Search creators" className="mb-7 flex flex-wrap items-center gap-4">
         <label className="block w-full sm:w-64">
           <span className="sr-only">Search creators</span>
           <input
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search name or email…"
+            placeholder="Search name, email, or Instagram…"
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm transition-colors focus:border-brand-400 focus:outline-2 focus:outline-brand-500"
           />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-[#53668e]">
+          <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+          Show archived
         </label>
       </section>
 
@@ -39,14 +44,24 @@ export function CreatorListClient({ workspaceId }: { workspaceId: string }) {
           <h2 id="creators-heading" className="text-lg font-bold">All Creators</h2>
         </div>
         <CloudCreators workspaceId={workspaceId}>
-          {(creators) => {
+          {(creators, _save, setArchived) => {
             const searchLower = search.trim().toLowerCase();
             const filtered = creators.filter(creator =>
-              !searchLower || creator.name.toLowerCase().includes(searchLower) || (creator.email ?? "").toLowerCase().includes(searchLower));
-            return <CreatorTable creators={filtered} emptyMessage={creators.length === 0 ? "No creators yet. Add your first creator." : "No creators match your search."} />;
+              (showArchived || !creator.archivedAt) &&
+              (!searchLower
+                || creator.name.toLowerCase().includes(searchLower)
+                || (creator.email ?? "").toLowerCase().includes(searchLower)
+                || (creator.instagramHandle ?? "").toLowerCase().includes(searchLower)));
+            const emptyMessage = creators.length === 0
+              ? "No creators yet. Add your first creator."
+              : filtered.length === 0 && !showArchived && creators.every(creator => creator.archivedAt)
+                ? "All your creators are archived. Tick \"Show archived\" to see them."
+                : "No creators match your search.";
+            return <CreatorTable creators={filtered} emptyMessage={emptyMessage} onSetArchived={setArchived} />;
           }}
         </CloudCreators>
       </section>
     </div>
   );
 }
+
