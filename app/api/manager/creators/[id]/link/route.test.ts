@@ -30,6 +30,9 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
+const mockActivateManualDeals = vi.fn();
+vi.mock("@/lib/manual-deals", () => ({ activateManualDeals: (...args: unknown[]) => mockActivateManualDeals(...args) }));
+
 const { POST } = await import("./route");
 
 function makeRequest(body: unknown) {
@@ -46,6 +49,8 @@ describe("POST /api/manager/creators/[id]/link", () => {
     mockAlreadyLinkedMaybeSingle.mockReset();
     mockRequireWorkspaceAccess.mockReset();
     mockUpdate.mockReset();
+    mockActivateManualDeals.mockReset();
+    mockActivateManualDeals.mockResolvedValue({ ok: true, value: { activated: 0 } });
   });
 
   it("rejects a request missing the account id", async () => {
@@ -99,5 +104,31 @@ describe("POST /api/manager/creators/[id]/link", () => {
     expect(response.status).toBe(200);
     expect(body.creator.linkedUserId).toBe("user-9");
     expect(body.creator.status).toBe("linked");
+  });
+
+  it("activates the creator's manual deals once the account is linked", async () => {
+    mockCreatorMaybeSingle.mockResolvedValue({ data: existingCreator });
+    mockRequireWorkspaceAccess.mockResolvedValue({ sub: "manager-1", email: "m@example.com" });
+    mockAccountMaybeSingle.mockResolvedValue({ data: { id: "user-9" } });
+    mockAlreadyLinkedMaybeSingle.mockResolvedValue({ data: null });
+    const updateChain = { eq: () => updateChain, select: () => updateChain, single: () => Promise.resolve({ data: { ...existingCreator, linkedUserId: "user-9", status: "linked" }, error: null }) };
+    mockUpdate.mockReturnValue(updateChain);
+    const response = await POST(makeRequest({ accountId: "user-9" }), { params });
+    expect(response.status).toBe(200);
+    expect(mockActivateManualDeals).toHaveBeenCalledWith(expect.anything(), { creatorId: "c1", linkedUserId: "user-9" });
+  });
+
+  it("reports an error when the manual deals could not be activated", async () => {
+    mockCreatorMaybeSingle.mockResolvedValue({ data: existingCreator });
+    mockRequireWorkspaceAccess.mockResolvedValue({ sub: "manager-1", email: "m@example.com" });
+    mockAccountMaybeSingle.mockResolvedValue({ data: { id: "user-9" } });
+    mockAlreadyLinkedMaybeSingle.mockResolvedValue({ data: null });
+    const updateChain = { eq: () => updateChain, select: () => updateChain, single: () => Promise.resolve({ data: { ...existingCreator, linkedUserId: "user-9", status: "linked" }, error: null }) };
+    mockUpdate.mockReturnValue(updateChain);
+    mockActivateManualDeals.mockResolvedValue({ ok: false, status: 500, error: "boom" });
+    const response = await POST(makeRequest({ accountId: "user-9" }), { params });
+    const body = await response.json();
+    expect(response.status).toBe(500);
+    expect(body.error).toMatch(/could not be activated/i);
   });
 });

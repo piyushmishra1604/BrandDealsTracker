@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
+import { NotificationBell } from "./notification-bell";
 
 export function TopBar({ userName, userRole, searchPlaceholder }: { userName: string; userRole: string; searchPlaceholder: string }) {
   const initial = userName.trim().charAt(0).toUpperCase() || "?";
@@ -16,10 +17,7 @@ export function TopBar({ userName, userRole, searchPlaceholder }: { userName: st
         />
       </label>
 
-      <button type="button" aria-label="Notifications" className="relative shrink-0 cursor-pointer rounded-lg p-2 text-[#53668e] hover:bg-[#f7f9fd]">
-        <Bell className="h-5 w-5" strokeWidth={2} />
-        <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
-      </button>
+      <NotificationBell />
 
       <button type="button" className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[#f7f9fd]">
         <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-accent-600 text-sm font-semibold text-white">

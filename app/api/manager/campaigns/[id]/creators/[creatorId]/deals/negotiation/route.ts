@@ -11,9 +11,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const authorized = await getAuthorizedAssignment(id, creatorId);
   if (!authorized) return NextResponse.json(NOT_FOUND, { status: 404 });
   const { creator, supabase } = authorized;
-  if (!creator.linkedUserId) return NextResponse.json({ deal: null, offers: [] });
 
-  const dealResult = await findCampaignCreatorDeal(supabase, id, creator.linkedUserId);
+  const dealResult = await findCampaignCreatorDeal(supabase, id, creator.id);
   if (!dealResult.ok) return NextResponse.json({ error: dealResult.error }, { status: dealResult.status });
   if (!dealResult.value) return NextResponse.json({ deal: null, offers: [] });
 
@@ -28,7 +27,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const authorized = await getAuthorizedAssignment(id, creatorId);
   if (!authorized) return NextResponse.json(NOT_FOUND, { status: 404 });
   const { creator, supabase } = authorized;
-  if (!creator.linkedUserId) return NextResponse.json({ error: "No deal to confirm." }, { status: 400 });
 
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
@@ -38,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "The note must be 500 characters or fewer." }, { status: 400 });
   }
 
-  const dealResult = await findCampaignCreatorDeal(supabase, id, creator.linkedUserId);
+  const dealResult = await findCampaignCreatorDeal(supabase, id, creator.id);
   if (!dealResult.ok) return NextResponse.json({ error: dealResult.error }, { status: dealResult.status });
   const deal = dealResult.value;
   if (!deal) return NextResponse.json({ error: "No deal found for this creator on this campaign." }, { status: 404 });

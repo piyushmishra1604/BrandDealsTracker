@@ -56,10 +56,31 @@ describe("POST manager assigned deal", () => {
     expect(response.status).toBe(400);
   });
 
-  it("rejects a creator who has not linked an account", async () => {
-    useFake({ creator: { id: "c1", linkedUserId: null } });
+  it("records a manual deal for a creator who has not linked an account, with no offer or notification", async () => {
+    const fake = useFake({ creator: { id: "c1", linkedUserId: null }, deal: null });
     const response = await POST(makeRequest({ amount: 15000, dueDate: "2999-01-01" }), { params });
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    const insert = fake.queries.find(q => q.table === "deals" && q.op === "insert");
+    expect(insert?.payload).toMatchObject({ acceptanceStatus: "manual", user_id: null, creatorId: "c1", campaignId: "camp-1" });
+    expect(fake.queries.some(q => q.table === "deal_offers")).toBe(false);
+    expect(fake.queries.some(q => q.table === "notifications")).toBe(false);
+  });
+
+  it("notifies the linked creator when a deal is first assigned", async () => {
+    const fake = useFake({ deal: null });
+    const response = await POST(makeRequest({ amount: 500, dueDate: "2999-01-01" }), { params });
+    expect(response.status).toBe(200);
+    const notification = fake.queries.find(q => q.table === "notifications" && q.op === "insert");
+    expect(notification?.payload).toMatchObject({ userId: "user-9", dealId: "deal-new", kind: "deal_assigned", workspaceId: "workspace-a" });
+  });
+
+  it("amends a manual deal without recording an offer or a negotiation event", async () => {
+    const fake = useFake({ creator: { id: "c1", linkedUserId: null }, deal: { ...pendingDeal, acceptanceStatus: "manual", user_id: null } });
+    const response = await POST(makeRequest({ amount: 18000, dueDate: "2999-01-01" }), { params });
+    expect(response.status).toBe(200);
+    expect(fake.rpcCalls[0].args).toMatchObject({ p_expected_status: "manual", p_event: null, p_actor: null });
+    expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ amount: 18000, acceptanceStatus: "manual" });
+    expect(fake.queries.some(q => q.table === "deal_offers")).toBe(false);
   });
 
   it("creates a pending deal and records the first offer", async () => {

@@ -115,3 +115,14 @@ describe("input guards", () => {
     expect(isNegotiationNote("x".repeat(501))).toBe(false);
   });
 });
+
+describe("manual deals", () => {
+  it("amends a manual deal directly, whether or not the amount changed, with no offer event", () => {
+    expect(managerOfferTransition({ status: "manual", amountChanged: true })).toEqual({ ok: true, status: "manual", event: null });
+    expect(managerOfferTransition({ status: "manual", amountChanged: false })).toEqual({ ok: true, status: "manual", event: null });
+  });
+
+  it("cannot be confirmed, because no creator has responded", () => {
+    expect(managerConfirmTransition("manual", 15000)).toMatchObject({ ok: false, httpStatus: 409 });
+  });
+});

@@ -4,16 +4,17 @@ import { managerAssignedFields, managerOfferTransition, isNegotiationNote, type 
 import {
   getAuthorizedAssignment, findCampaignCreatorDeal, applyDealChange, type Supabase,
 } from "@/lib/assigned-deal-store";
+import { notifyDealAssigned } from "@/lib/notification-store";
 
 const NOT_FOUND = { error: "Campaign not found." } as const;
 
+// Linked creators get a pending deal and a notification. Unlinked creators get a manual deal
+// that is recorded off-platform and has no owner until the creator is linked.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {
   const { id, creatorId } = await params;
   const authorized = await getAuthorizedAssignment(id, creatorId);
   if (!authorized) return NextResponse.json(NOT_FOUND, { status: 404 });
   const { campaign, access, creator, supabase } = authorized;
-
-  if (!creator.linkedUserId) return NextResponse.json({ error: "Link this creator to their account before assigning a deal." }, { status: 400 });
 
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
@@ -27,13 +28,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const offerNote = typeof note === "string" ? note : "";
 
-  const existingResult = await findCampaignCreatorDeal(supabase, id, creator.linkedUserId);
+  const existingResult = await findCampaignCreatorDeal(supabase, id, creator.id);
   if (!existingResult.ok) return NextResponse.json({ error: existingResult.error }, { status: existingResult.status });
   const existing = existingResult.value;
 
   if (!existing) {
     return createAssignedDeal({
-      supabase, campaign, managerUserId: access.sub, campaignId: id, creatorProfileId: creator.id, linkedUserId: creator.linkedUserId, input: body, offerNote,
+      supabase, campaign, managerUserId: access.sub, campaignId: id, creatorProfileId: creator.id, linkedUserId: creator.linkedUserId ?? null, input: body, offerNote,
     });
   }
 
@@ -59,11 +60,12 @@ async function createAssignedDeal(input: {
   managerUserId: string;
   campaignId: string;
   creatorProfileId: string;
-  linkedUserId: string;
+  linkedUserId: string | null;
   input: ManagerAssignmentInput;
   offerNote: string;
 }) {
   const { supabase, campaign, managerUserId, campaignId, creatorProfileId, linkedUserId, offerNote } = input;
+  const isLinked = linkedUserId !== null;
   const { data, error } = await supabase.from("deals").insert({
     ...managerAssignedFields(null, input.input, campaign.brand),
     dealDate: todayDate(),
@@ -75,11 +77,13 @@ async function createAssignedDeal(input: {
     campaignId,
     creatorId: creatorProfileId,
     assignedByUserId: managerUserId,
-    acceptanceStatus: "pending",
+    acceptanceStatus: isLinked ? "pending" : "manual",
     user_id: linkedUserId,
   }).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const deal = data as Deal;
+
+  if (!isLinked) return NextResponse.json({ deal });
 
   // The first offer goes into the history table. If that fails, remove the deal so the
   // manager can retry instead of being left with a pending deal that has no offer on record.
@@ -90,6 +94,7 @@ async function createAssignedDeal(input: {
     await supabase.from("deals").delete().eq("id", deal.id);
     return NextResponse.json({ error: offerError.message }, { status: 500 });
   }
+  await notifyDealAssigned(supabase, { userId: linkedUserId, workspaceId: campaign.workspaceId, dealId: deal.id });
   return NextResponse.json({ deal });
 }
 
@@ -98,9 +103,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const authorized = await getAuthorizedAssignment(id, creatorId);
   if (!authorized) return NextResponse.json(NOT_FOUND, { status: 404 });
   const { creator, supabase } = authorized;
-  if (!creator.linkedUserId) return NextResponse.json({ error: "No deal to remove." }, { status: 400 });
 
-  const { data, error } = await supabase.from("deals").delete().eq("campaignId", id).eq("user_id", creator.linkedUserId).select("id");
+  const { data, error } = await supabase.from("deals").delete().eq("campaignId", id).eq("creatorId", creator.id).select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length !== 1) return NextResponse.json({ error: "No deal found for this creator on this campaign." }, { status: 400 });
   return NextResponse.json({ ok: true });

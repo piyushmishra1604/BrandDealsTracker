@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireWorkspaceAccess } from "@/lib/auth/workspace";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { type Creator } from "@/lib/creators";
+import { activateManualDeals } from "@/lib/manual-deals";
 
 const NOT_FOUND = { error: "Creator not found." } as const;
 
@@ -44,5 +45,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Re-linking retries cleanly: the link above is idempotent and only manual deals are converted.
+  const activated = await activateManualDeals(supabase, { creatorId: id, linkedUserId: accountId });
+  if (!activated.ok) return NextResponse.json({ error: `The account is linked, but its manual deals could not be activated: ${activated.error}` }, { status: activated.status });
   return NextResponse.json({ creator: data as Creator });
 }

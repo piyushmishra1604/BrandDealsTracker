@@ -16,8 +16,8 @@ export type DealOffer = {
 export type StoreResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404 | 409 | 500; error: string };
 
 // Assigning a deal requires the creator to already be on this campaign (added via the
-// Creators & Deals picker) and linked to a real account, because deals.user_id must point at
-// a real app_users row.
+// Creators & Deals picker). Linked creators get a pending deal owned by their account; unlinked
+// creators get a manual deal with no owner.
 export async function getAuthorizedAssignment(campaignId: string, creatorId: string) {
   const supabase = getSupabaseAdmin();
   const { data: campaign } = await supabase.from("campaigns").select("id, workspaceId, brand").eq("id", campaignId).maybeSingle();
@@ -34,9 +34,10 @@ export async function getAuthorizedAssignment(campaignId: string, creatorId: str
   return { campaign, access, creator, supabase };
 }
 
-// The one assigned deal for a campaign/creator pair, or null when none exists yet.
-export async function findCampaignCreatorDeal(supabase: Supabase, campaignId: string, userId: string): Promise<StoreResult<Deal | null>> {
-  const { data, error } = await supabase.from("deals").select("*").eq("campaignId", campaignId).eq("user_id", userId).maybeSingle();
+// The one assigned deal for a campaign/creator pair, or null when none exists yet. Keyed on the
+// creator directory id because manual deals have no user_id.
+export async function findCampaignCreatorDeal(supabase: Supabase, campaignId: string, creatorId: string): Promise<StoreResult<Deal | null>> {
+  const { data, error } = await supabase.from("deals").select("*").eq("campaignId", campaignId).eq("creatorId", creatorId).maybeSingle();
   if (error) return { ok: false, status: 500, error: error.message };
   if (!data) return { ok: true, value: null };
   if (!isDeal(data)) return { ok: false, status: 500, error: "The saved deal has an unexpected format." };

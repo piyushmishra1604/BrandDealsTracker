@@ -67,6 +67,8 @@ export function creatorTransition(input: {
 // A manager save only creates an offer when the amount changes or the deal was declined.
 // Other edits (dates, deliverables, notes) keep the current status.
 export function managerOfferTransition(input: { status: AcceptanceStatus; amountChanged: boolean }): OfferTransition {
+  // Manual deals were agreed off-platform, so the manager amends them directly with no offer.
+  if (input.status === "manual") return { ok: true, status: "manual", event: null };
   if (input.status === "declined") return { ok: true, status: "pending", event: "offer" };
   if (!input.amountChanged) return { ok: true, status: input.status, event: null };
   if (input.status === "accepted") {

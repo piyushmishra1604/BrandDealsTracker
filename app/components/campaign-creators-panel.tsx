@@ -72,7 +72,7 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
     return () => { active = false; };
   }, [campaignId, workspaceId]);
 
-  const availableCreators = allCreators.filter(creator => !entries.some(entry => entry.creatorId === creator.id));
+  const availableCreators = allCreators.filter(creator => !creator.archivedAt && !entries.some(entry => entry.creatorId === creator.id));
 
   useEffect(() => { onCountChange?.(entries.length); }, [entries.length, onCountChange]);
   useEffect(() => {
@@ -239,13 +239,9 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                   </td>
                   <td className="whitespace-nowrap px-3 py-4">
                     <div className="flex items-center justify-end gap-1">
-                      {entry.creator?.linkedUserId ? (
-                        <button type="button" onClick={() => editingDealFor === entry.creatorId ? setEditingDealFor(null) : startEditDeal(entry)} aria-label={`${entry.deal ? "Edit" : "Assign"} deal for ${entry.creator?.name ?? "creator"}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[#405579] hover:bg-brand-50 hover:text-brand-600">
-                          <Pencil className="h-4 w-4" strokeWidth={2} />
-                        </button>
-                      ) : (
-                        <span className="text-xs text-[#53668e]" title="Link this creator to their account before assigning a deal">Link required</span>
-                      )}
+                      <button type="button" onClick={() => editingDealFor === entry.creatorId ? setEditingDealFor(null) : startEditDeal(entry)} aria-label={`${entry.deal ? "Edit" : "Assign"} deal for ${entry.creator?.name ?? "creator"}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[#405579] hover:bg-brand-50 hover:text-brand-600">
+                        <Pencil className="h-4 w-4" strokeWidth={2} />
+                      </button>
                       <button type="button" onClick={() => void removeCreator(entry.creatorId)} aria-label={`Remove ${entry.creator?.name ?? "creator"}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[#405579] hover:bg-red-50 hover:text-red-600">
                         <X className="h-4 w-4" strokeWidth={2} />
                       </button>
@@ -268,10 +264,12 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                           Notes (optional)
                           <input type="text" value={dealNotes} onChange={(event) => setDealNotes(event.target.value)} maxLength={5000} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
                         </label>
-                        <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-[#405579]">
-                          Message to creator (optional)
-                          <input type="text" value={dealOfferNote} onChange={(event) => setDealOfferNote(event.target.value)} maxLength={500} placeholder="Sent with your next offer" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                        </label>
+                        {entry.creator?.linkedUserId && (
+                          <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-[#405579]">
+                            Message to creator (optional)
+                            <input type="text" value={dealOfferNote} onChange={(event) => setDealOfferNote(event.target.value)} maxLength={500} placeholder="Sent with your next offer" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                          </label>
+                        )}
                         <button type="button" onClick={() => void saveDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                           {savingDeal ? "Saving…" : "Save Deal"}
                         </button>

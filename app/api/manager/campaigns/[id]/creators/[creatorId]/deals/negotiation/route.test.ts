@@ -76,3 +76,20 @@ describe("POST manager confirm", () => {
     expect(response.status).toBe(409);
   });
 });
+
+describe("manual deals (creator not linked)", () => {
+  it("can be read by the manager", async () => {
+    useFake({ ...deal, acceptanceStatus: "manual", user_id: null });
+    const response = await GET(request(), { params });
+    expect(response.status).toBe(200);
+    expect((await response.json()).deal.acceptanceStatus).toBe("manual");
+  });
+
+  it("cannot be confirmed, since no creator has responded to them", async () => {
+    const fake = useFake({ ...deal, acceptanceStatus: "manual", user_id: null });
+    const response = await POST(request({ action: "confirm" }), { params });
+    expect(response.status).toBe(409);
+    expect(fake.rpcCalls).toHaveLength(0);
+  });
+});
+

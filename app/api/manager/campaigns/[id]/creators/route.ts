@@ -25,18 +25,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       .select("*, creator:creators(id, name, instagramHandle, category, status, linkedUserId)")
       .eq("campaignId", id)
       .order("created_at", { ascending: true }),
-    // Deals have no FK to campaign_creators (they key off the creator's real account id,
-    // not the directory contact id), so the per-creator deal is matched up in JS below
-    // instead of a single PostgREST embed.
+    // Deals have no FK to campaign_creators, so the per-creator deal is matched up in JS
+    // below by creatorId instead of a single PostgREST embed.
     authorized.supabase.from("deals").select("*").eq("campaignId", id),
   ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (dealsError) return NextResponse.json({ error: dealsError.message }, { status: 500 });
 
-  const dealsByUserId = new Map((deals ?? []).map(deal => [deal.user_id, deal]));
+  const dealsByCreatorId = new Map((deals ?? []).map(deal => [deal.creatorId, deal]));
   const entries = (data as CampaignCreatorEntry[]).map(entry => ({
     ...entry,
-    deal: entry.creator?.linkedUserId ? (dealsByUserId.get(entry.creator.linkedUserId) ?? null) : null,
+    deal: dealsByCreatorId.get(entry.creatorId) ?? null,
   }));
   return NextResponse.json({ entries });
 }
@@ -53,8 +52,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // The creator must belong to the same workspace as the campaign — never trust a
   // creatorId from the client without re-checking it against the authorized workspace.
-  const { data: creator } = await authorized.supabase.from("creators").select("id").eq("id", creatorId).eq("workspaceId", authorized.campaign.workspaceId).maybeSingle();
+  const { data: creator } = await authorized.supabase.from("creators").select("id, archivedAt").eq("id", creatorId).eq("workspaceId", authorized.campaign.workspaceId).maybeSingle();
   if (!creator) return NextResponse.json({ error: "Creator not found in this workspace." }, { status: 404 });
+  if (creator.archivedAt) return NextResponse.json({ error: "This creator is archived. Restore them before adding them to a campaign." }, { status: 400 });
 
   const { data, error } = await authorized.supabase
     .from("campaign_creators")

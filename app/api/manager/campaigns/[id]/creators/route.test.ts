@@ -56,21 +56,31 @@ describe("GET /api/manager/campaigns/[id]/creators", () => {
     expect(body.entries).toHaveLength(1);
   });
 
-  it("attaches the matching assigned deal for a linked creator", async () => {
+  it("attaches the matching assigned deal for a linked creator, matched by creatorId", async () => {
     mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
     mockEntriesOrder.mockResolvedValue({ data: [{ id: "cc-1", campaignId: "camp-1", creatorId: "c1", creator: { id: "c1", linkedUserId: "user-9" } }], error: null });
-    mockDealsEq.mockResolvedValue({ data: [{ id: "deal-1", user_id: "user-9", campaignId: "camp-1", amount: 500 }], error: null });
+    mockDealsEq.mockResolvedValue({ data: [{ id: "deal-1", user_id: "user-9", creatorId: "c1", campaignId: "camp-1", amount: 500 }], error: null });
     const response = await GET(makeGetRequest(), { params });
     const body = await response.json();
-    expect(body.entries[0].deal).toEqual({ id: "deal-1", user_id: "user-9", campaignId: "camp-1", amount: 500 });
+    expect(body.entries[0].deal).toEqual({ id: "deal-1", user_id: "user-9", creatorId: "c1", campaignId: "camp-1", amount: 500 });
   });
 
-  it("leaves deal null for a creator who isn't linked, even if deals exist on the campaign", async () => {
+  it("attaches a manual deal for a creator who isn't linked", async () => {
     mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
     mockEntriesOrder.mockResolvedValue({ data: [{ id: "cc-1", campaignId: "camp-1", creatorId: "c1", creator: { id: "c1", linkedUserId: null } }], error: null });
-    mockDealsEq.mockResolvedValue({ data: [{ id: "deal-1", user_id: "user-9", campaignId: "camp-1", amount: 500 }], error: null });
+    mockDealsEq.mockResolvedValue({ data: [{ id: "deal-1", user_id: null, creatorId: "c1", campaignId: "camp-1", amount: 500, acceptanceStatus: "manual" }], error: null });
+    const response = await GET(makeGetRequest(), { params });
+    const body = await response.json();
+    expect(body.entries[0].deal).toMatchObject({ id: "deal-1", acceptanceStatus: "manual" });
+  });
+
+  it("leaves deal null when the campaign's deals belong to other creators", async () => {
+    mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
+    mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
+    mockEntriesOrder.mockResolvedValue({ data: [{ id: "cc-1", campaignId: "camp-1", creatorId: "c1", creator: { id: "c1", linkedUserId: "user-9" } }], error: null });
+    mockDealsEq.mockResolvedValue({ data: [{ id: "deal-1", user_id: "user-9", creatorId: "c2", campaignId: "camp-1", amount: 500 }], error: null });
     const response = await GET(makeGetRequest(), { params });
     const body = await response.json();
     expect(body.entries[0].deal).toBeNull();
@@ -98,6 +108,15 @@ describe("POST /api/manager/campaigns/[id]/creators", () => {
     mockCreatorMaybeSingle.mockResolvedValue({ data: null });
     const response = await POST(makePostRequest({ creatorId: "c-other-workspace" }), { params });
     expect(response.status).toBe(404);
+    expect(mockInsertSingle).not.toHaveBeenCalled();
+  });
+
+  it("rejects adding an archived creator to a campaign", async () => {
+    mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
+    mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
+    mockCreatorMaybeSingle.mockResolvedValue({ data: { id: "c1", archivedAt: "2026-10-01T00:00:00Z" } });
+    const response = await POST(makePostRequest({ creatorId: "c1" }), { params });
+    expect(response.status).toBe(400);
     expect(mockInsertSingle).not.toHaveBeenCalled();
   });
 
