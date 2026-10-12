@@ -34,7 +34,7 @@ export function CreatorManagementClient({ workspaceId }: { workspaceId: string }
         {(creators) => {
           const managed = creators.filter(creator => creator.relationship === "managed" && !creator.archivedAt);
           const activeDeals = managed.reduce((sum, creator) => sum + (creator.activeDealCount ?? 0), 0);
-          const committed = managed.reduce((sum, creator) => sum + (creator.activeDealValue ?? 0), 0);
+          const committed = managed.reduce((sum, creator) => sum + (creator.activeDealValue ?? 0) + (creator.completedDealValue ?? 0), 0);
           const visible = creators.filter(creator =>
             (view === "all" || creator.relationship === "managed") && (showArchived || !creator.archivedAt));
 
@@ -109,6 +109,7 @@ function RosterTable({ creators }: { creators: CreatorSummary[] }) {
             <th scope="col" className="px-5 py-3 text-right font-semibold">Campaigns</th>
             <th scope="col" className="px-5 py-3 text-right font-semibold">Active deals</th>
             <th scope="col" className="px-5 py-3 text-right font-semibold">Active value</th>
+            <th scope="col" className="px-5 py-3 text-right font-semibold">Completed</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[#e5ebf5]">
@@ -124,6 +125,7 @@ function RosterTable({ creators }: { creators: CreatorSummary[] }) {
               <td className="px-5 py-4 text-right tabular-nums">{creator.campaignCount ?? 0}</td>
               <td className="px-5 py-4 text-right tabular-nums">{creator.activeDealCount ?? 0}</td>
               <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums">{formatMoney(creator.activeDealValue ?? 0)}</td>
+              <td className="px-5 py-4 text-right tabular-nums">{creator.completedDealCount ?? 0}</td>
             </tr>
           ))}
         </tbody>

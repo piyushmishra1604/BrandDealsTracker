@@ -44,6 +44,8 @@ export type CreatorSummary = Creator & {
   dealCount?: number;
   activeDealCount?: number;
   activeDealValue?: number;
+  completedDealCount?: number;
+  completedDealValue?: number;
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

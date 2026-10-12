@@ -16,7 +16,7 @@ const offerEventLabels: Record<DealOffer["event"], string> = {
   decline: "declined",
 };
 
-const acceptanceLabels: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
+export const acceptanceLabels: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
   pending: "Pending",
   countered: "Counter offer",
   accepted: "Accepted",

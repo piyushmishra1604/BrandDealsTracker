@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireWorkspaceAccess } from "@/lib/auth/workspace";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isCreatorInput, type Creator, type CreatorInput, type CreatorSummary } from "@/lib/creators";
+import { summarizeCreatorDeals } from "@/lib/creator-deal-history";
+import { type AcceptanceStatus } from "@/lib/deals";
 
 function countByCreator(rows: { creatorId: string }[] | null) {
   const counts = new Map<string, number>();
@@ -9,17 +11,17 @@ function countByCreator(rows: { creatorId: string }[] | null) {
   return counts;
 }
 
-type DealRow = { creatorId: string; amount: number | null; acceptanceStatus: string | null };
+type DealRow = { creatorId: string; amount: number | null; acceptanceStatus: AcceptanceStatus | null; moneyReceived: boolean };
 
-// Declined deals stay in the history but don't count as active or as committed value.
-function activeDealTotals(rows: DealRow[] | null) {
-  const totals = new Map<string, { count: number; value: number }>();
+// Declined deals stay in the history but count toward neither active nor completed totals.
+function dealSummaries(rows: DealRow[] | null) {
+  const grouped = new Map<string, DealRow[]>();
   for (const row of rows ?? []) {
-    if (row.acceptanceStatus === "declined") continue;
-    const current = totals.get(row.creatorId) ?? { count: 0, value: 0 };
-    totals.set(row.creatorId, { count: current.count + 1, value: current.value + (Number(row.amount) || 0) });
+    const list = grouped.get(row.creatorId) ?? [];
+    list.push(row);
+    grouped.set(row.creatorId, list);
   }
-  return totals;
+  return new Map([...grouped].map(([creatorId, deals]) => [creatorId, summarizeCreatorDeals(deals)]));
 }
 
 // Archived creators are included so the directory can show them behind a toggle.
@@ -42,19 +44,21 @@ export async function GET(request: Request) {
 
   const [campaignLinks, deals] = await Promise.all([
     supabase.from("campaign_creators").select("creatorId").in("creatorId", ids),
-    supabase.from("deals").select("creatorId, amount, acceptanceStatus").in("creatorId", ids),
+    supabase.from("deals").select("creatorId, amount, acceptanceStatus, moneyReceived").in("creatorId", ids),
   ]);
   if (campaignLinks.error || deals.error) return NextResponse.json({ error: (campaignLinks.error ?? deals.error)?.message }, { status: 500 });
 
   const campaignCounts = countByCreator(campaignLinks.data as { creatorId: string }[] | null);
   const dealCounts = countByCreator(deals.data as { creatorId: string }[] | null);
-  const activeTotals = activeDealTotals(deals.data as DealRow[] | null);
+  const totals = dealSummaries(deals.data as DealRow[] | null);
   const summaries: CreatorSummary[] = creators.map(creator => ({
     ...creator,
     campaignCount: campaignCounts.get(creator.id) ?? 0,
     dealCount: dealCounts.get(creator.id) ?? 0,
-    activeDealCount: activeTotals.get(creator.id)?.count ?? 0,
-    activeDealValue: activeTotals.get(creator.id)?.value ?? 0,
+    activeDealCount: totals.get(creator.id)?.activeCount ?? 0,
+    activeDealValue: totals.get(creator.id)?.activeValue ?? 0,
+    completedDealCount: totals.get(creator.id)?.completedCount ?? 0,
+    completedDealValue: totals.get(creator.id)?.completedValue ?? 0,
   }));
   return NextResponse.json({ creators: summaries });
 }

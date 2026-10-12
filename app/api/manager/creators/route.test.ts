@@ -42,18 +42,25 @@ describe("GET /api/manager/creators", () => {
     expect(body.creators[1]).toMatchObject({ id: "c2", campaignCount: 0, dealCount: 0 });
   });
 
-  it("counts active deals and their value, leaving declined deals out of both", async () => {
+  it("splits deals into active and completed, leaving declined deals out of both", async () => {
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
     mockOrder.mockResolvedValue({ data: [{ id: "c1", workspaceId: "workspace-a" }], error: null });
     relatedRows.campaign_creators = [];
     relatedRows.deals = [
-      { creatorId: "c1", amount: 18000, acceptanceStatus: "confirmed" },
-      { creatorId: "c1", amount: 9000, acceptanceStatus: "pending" },
-      { creatorId: "c1", amount: 5000, acceptanceStatus: "declined" },
+      { creatorId: "c1", amount: 18000, acceptanceStatus: "confirmed", moneyReceived: false },
+      { creatorId: "c1", amount: 9000, acceptanceStatus: "pending", moneyReceived: false },
+      { creatorId: "c1", amount: 5000, acceptanceStatus: "declined", moneyReceived: false },
+      { creatorId: "c1", amount: 7000, acceptanceStatus: "confirmed", moneyReceived: true },
     ];
     const response = await GET(makeRequest("http://localhost/api/manager/creators?workspaceId=workspace-a"));
     const body = await response.json();
-    expect(body.creators[0]).toMatchObject({ dealCount: 3, activeDealCount: 2, activeDealValue: 27000 });
+    expect(body.creators[0]).toMatchObject({
+      dealCount: 4,
+      activeDealCount: 2,
+      activeDealValue: 27000,
+      completedDealCount: 1,
+      completedDealValue: 7000,
+    });
   });
 
   it("rejects a request with no workspace access (cross-agency isolation)", async () => {
