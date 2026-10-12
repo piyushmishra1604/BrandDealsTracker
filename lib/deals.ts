@@ -12,12 +12,12 @@ export function isDeliverables(value: unknown): value is Deliverable[] {
   );
 }
 
-// Only set when a manager assigned this deal from a campaign (M5) — "pending" until the
-// creator accepts or declines it; absent entirely for deals a creator created themselves.
-export type AcceptanceStatus = "pending" | "accepted" | "declined";
+// Only set when a manager assigned this deal from a campaign (M5). The negotiation rules live
+// in assigned-deals.ts; "confirmed" is final, "declined" can be reopened by a new manager offer.
+export type AcceptanceStatus = "pending" | "countered" | "accepted" | "confirmed" | "declined";
 
 export function isAcceptanceStatus(value: unknown): value is AcceptanceStatus {
-  return value === "pending" || value === "accepted" || value === "declined";
+  return value === "pending" || value === "countered" || value === "accepted" || value === "confirmed" || value === "declined";
 }
 
 export type Deal = {

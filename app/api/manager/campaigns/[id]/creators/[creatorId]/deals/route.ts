@@ -1,28 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireWorkspaceAccess } from "@/lib/auth/workspace";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isAssignedDealInput, assignedDealDateError, todayDate, type Deal } from "@/lib/deals";
+import { managerAssignedFields, managerOfferTransition, isNegotiationNote, type ManagerAssignmentInput } from "@/lib/assigned-deals";
+import {
+  getAuthorizedAssignment, findCampaignCreatorDeal, applyDealChange, type Supabase,
+} from "@/lib/assigned-deal-store";
 
 const NOT_FOUND = { error: "Campaign not found." } as const;
-
-// Assigning a deal requires the creator to already be on this campaign (added via the
-// Creators & Deals picker) and linked to a real account — deals.user_id must point at a
-// real app_users row, so there's nowhere to attach a deal for an unlinked contact yet.
-async function getAuthorizedAssignment(campaignId: string, creatorId: string) {
-  const supabase = getSupabaseAdmin();
-  const { data: campaign } = await supabase.from("campaigns").select("id, workspaceId, brand").eq("id", campaignId).maybeSingle();
-  if (!campaign) return null;
-  const access = await requireWorkspaceAccess(campaign.workspaceId);
-  if (!access) return null;
-
-  const { data: creator } = await supabase.from("creators").select("id, linkedUserId").eq("id", creatorId).eq("workspaceId", campaign.workspaceId).maybeSingle();
-  if (!creator) return null;
-
-  const { data: membership } = await supabase.from("campaign_creators").select("id").eq("campaignId", campaignId).eq("creatorId", creatorId).maybeSingle();
-  if (!membership) return null;
-
-  return { campaign, access, creator, supabase };
-}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {
   const { id, creatorId } = await params;
@@ -38,35 +21,74 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const dateError = assignedDealDateError(body);
   if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
 
-  // The brand and deal date aren't manager-editable — brand always matches the campaign's
-  // brand, and the deal date is always the day the assignment was made.
-  const dealFields = {
-    brand: campaign.brand,
-    amount: body.amount,
+  const note = (body as { note?: unknown }).note;
+  if (note !== undefined && note !== null && !isNegotiationNote(note)) {
+    return NextResponse.json({ error: "The note must be 500 characters or fewer." }, { status: 400 });
+  }
+  const offerNote = typeof note === "string" ? note : "";
+
+  const existingResult = await findCampaignCreatorDeal(supabase, id, creator.linkedUserId);
+  if (!existingResult.ok) return NextResponse.json({ error: existingResult.error }, { status: existingResult.status });
+  const existing = existingResult.value;
+
+  if (!existing) {
+    return createAssignedDeal({
+      supabase, campaign, managerUserId: access.sub, campaignId: id, linkedUserId: creator.linkedUserId, input: body, offerNote,
+    });
+  }
+
+  const currentStatus = existing.acceptanceStatus ?? "pending";
+  const transition = managerOfferTransition({ status: currentStatus, amountChanged: existing.amount !== body.amount });
+  if (!transition.ok) return NextResponse.json({ error: transition.error }, { status: transition.httpStatus });
+
+  const result = await applyDealChange(supabase, {
+    dealId: existing.id,
+    expectedStatus: currentStatus,
+    patch: { ...managerAssignedFields(existing, body, campaign.brand), acceptanceStatus: transition.status },
+    actor: transition.event ? "manager" : null,
+    event: transition.event,
+    note: offerNote,
+  });
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json({ deal: result.value });
+}
+
+async function createAssignedDeal(input: {
+  supabase: Supabase;
+  campaign: { workspaceId: string; brand: string };
+  managerUserId: string;
+  campaignId: string;
+  linkedUserId: string;
+  input: ManagerAssignmentInput;
+  offerNote: string;
+}) {
+  const { supabase, campaign, managerUserId, campaignId, linkedUserId, offerNote } = input;
+  const { data, error } = await supabase.from("deals").insert({
+    ...managerAssignedFields(null, input.input, campaign.brand),
     dealDate: todayDate(),
-    dueDate: body.dueDate,
-    deliverables: body.deliverables ?? [],
-    notes: body.notes ?? null,
     contentCreated: false,
     sentToBrand: false,
     posted: false,
     moneyReceived: false,
     workspaceId: campaign.workspaceId,
-    campaignId: campaign.id,
-    assignedByUserId: access.sub,
-    acceptanceStatus: "pending" as const,
-    user_id: creator.linkedUserId,
-  };
-
-  // One assigned deal per campaign/creator pair — re-submitting the form edits the existing
-  // deal instead of creating a second one for the same assignment.
-  const { data: existing } = await supabase.from("deals").select("id").eq("campaignId", id).eq("user_id", creator.linkedUserId).maybeSingle();
-  const query = existing
-    ? supabase.from("deals").update(dealFields).eq("id", existing.id).select().single()
-    : supabase.from("deals").insert(dealFields).select().single();
-  const { data, error } = await query;
+    campaignId,
+    assignedByUserId: managerUserId,
+    acceptanceStatus: "pending",
+    user_id: linkedUserId,
+  }).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ deal: data as Deal });
+  const deal = data as Deal;
+
+  // The first offer goes into the history table. If that fails, remove the deal so the
+  // manager can retry instead of being left with a pending deal that has no offer on record.
+  const { error: offerError } = await supabase.from("deal_offers").insert({
+    dealId: deal.id, actor: "manager", event: "offer", amount: deal.amount, note: offerNote,
+  });
+  if (offerError) {
+    await supabase.from("deals").delete().eq("id", deal.id);
+    return NextResponse.json({ error: offerError.message }, { status: 500 });
+  }
+  return NextResponse.json({ deal });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {

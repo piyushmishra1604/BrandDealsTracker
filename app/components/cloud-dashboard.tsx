@@ -6,7 +6,7 @@ import { type Deal, isDeal, dealDateError } from "@/lib/deals";
 const button = "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50";
 
 export function CloudDashboard({ children }: {
-  children: (deals: Deal[], save: (deal: Deal) => Promise<string | null>, remove: (id: string) => Promise<string | null>) => ReactNode;
+  children: (deals: Deal[], save: (deal: Deal) => Promise<string | null>, remove: (id: string) => Promise<string | null>, replace: (deal: Deal) => void) => ReactNode;
 }) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -52,8 +52,12 @@ export function CloudDashboard({ children }: {
     } catch { return "Could not delete the deal. Check your connection and try again."; }
   }
 
+  function replace(deal: Deal) {
+    setDeals(current => current.map(item => item.id === deal.id ? deal : item));
+  }
+
   return <>
     {error && <div role="alert" className="p-6 text-red-700">{error} <button className={button} onClick={() => setRetry(value => value + 1)}>Retry loading</button></div>}
-    {loaded ? children(deals, save, remove) : !error && <p role="status" className="p-8">Loading your deals…</p>}
+    {loaded ? children(deals, save, remove, replace) : !error && <p role="status" className="p-8">Loading your deals…</p>}
   </>;
 }

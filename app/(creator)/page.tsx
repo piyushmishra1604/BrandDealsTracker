@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
 import { type Invoice, currencySymbols, invoiceTotal, invoiceFileName } from "@/lib/invoices";
 import { CloudDashboard } from "../components/cloud-dashboard";
+import { DealNegotiation, negotiationBadge } from "../components/deal-negotiation";
 import { CloudInvoices } from "../components/cloud-invoices";
 import { CloudProfile } from "../components/cloud-profile";
 import { CreateInvoiceButton } from "../components/invoice-modal";
@@ -26,16 +27,16 @@ const formatMonth = (month: string, style: "short" | "long") =>
   }).format(new Date(`${month}-01T00:00:00Z`));
 
 export default function Home() {
-  return <CloudDashboard>{(deals, persistDeal, removeDeal) => (
+  return <CloudDashboard>{(deals, persistDeal, removeDeal, replaceDeal) => (
     <CloudInvoices>{(invoices) => (
       <CloudProfile>{(profile) => (
-        <Dashboard deals={deals} persistDeal={persistDeal} removeDeal={removeDeal} invoices={invoices} senderName={profile.senderName} />
+        <Dashboard deals={deals} persistDeal={persistDeal} removeDeal={removeDeal} replaceDeal={replaceDeal} invoices={invoices} senderName={profile.senderName} />
       )}</CloudProfile>
     )}</CloudInvoices>
   )}</CloudDashboard>;
 }
 
-function Dashboard({ deals, persistDeal, removeDeal, invoices, senderName }: { deals: Deal[]; persistDeal: (deal: Deal) => Promise<string | null>; removeDeal: (id: string) => Promise<string | null>; invoices: Invoice[]; senderName: string }) {
+function Dashboard({ deals, persistDeal, removeDeal, replaceDeal, invoices, senderName }: { deals: Deal[]; persistDeal: (deal: Deal) => Promise<string | null>; removeDeal: (id: string) => Promise<string | null>; replaceDeal: (deal: Deal) => void; invoices: Invoice[]; senderName: string }) {
   const [notice, setNotice] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   async function deleteDeal(deal: Deal) {
@@ -263,12 +264,12 @@ function Dashboard({ deals, persistDeal, removeDeal, invoices, senderName }: { d
                       <td className="whitespace-nowrap px-5 py-4">{formatDate(deal.dueDate)}</td>
                       <td className="px-5 py-4"><DealStatus deal={deal} /></td>
                       <td className="px-3 py-2">
-                        <DealActions deal={deal} disabled={deletingId !== null} onEdit={() => setExpandedDeal(deal.id)} onDelete={() => void deleteDeal(deal)} />
+                        <DealActions deal={deal} disabled={deletingId !== null} onEdit={() => setExpandedDeal(deal.id)} onDelete={deal.assignedByUserId ? null : () => void deleteDeal(deal)} />
                       </td>
                     </tr>
                     <tr id={`deliverables-${deal.id}`} hidden={detailsId !== deal.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
                       <td colSpan={6} className="px-6 py-5">
-                        <DealDetails deal={deal} onSave={persistDeal} invoices={invoices} />
+                        <DealDetails deal={deal} onSave={persistDeal} onDealUpdated={replaceDeal} invoices={invoices} />
                       </td>
                     </tr>
                     <tr id={`details-${deal.id}`} hidden={expandedDeal !== deal.id} className="border-t border-[#edf1f8] bg-[#f8faff]">
@@ -310,7 +311,7 @@ function Dashboard({ deals, persistDeal, removeDeal, invoices, senderName }: { d
                       </div>
                       <p className="mt-1 pl-6 text-sm tabular-nums text-[#53668e]">{formatMoney(deal.amount)}</p>
                     </div>
-                    <DealActions deal={deal} disabled={deletingId !== null} onEdit={() => setExpandedDeal(deal.id)} onDelete={() => void deleteDeal(deal)} />
+                    <DealActions deal={deal} disabled={deletingId !== null} onEdit={() => setExpandedDeal(deal.id)} onDelete={deal.assignedByUserId ? null : () => void deleteDeal(deal)} />
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 pl-6 text-xs text-[#53668e]">
                     <span>Deal: {formatDate(deal.dealDate)}</span>
@@ -319,7 +320,7 @@ function Dashboard({ deals, persistDeal, removeDeal, invoices, senderName }: { d
                   </div>
                 </div>
                 <div id={`deliverables-${deal.id}`} hidden={detailsId !== deal.id} className="bg-[#f8faff] px-5 py-5">
-                  <DealDetails deal={deal} onSave={persistDeal} invoices={invoices} />
+                  <DealDetails deal={deal} onSave={persistDeal} onDealUpdated={replaceDeal} invoices={invoices} />
                 </div>
                 <div id={`details-${deal.id}`} hidden={expandedDeal !== deal.id} className="bg-[#f8faff] px-5 py-4">
                   {expandedDeal === deal.id && <DealEditor deal={deal} onSave={saveDeal} onCancel={() => setExpandedDeal(null)} />}
@@ -348,7 +349,7 @@ function Dashboard({ deals, persistDeal, removeDeal, invoices, senderName }: { d
   );
 }
 
-function DealDetails({ deal, onSave, invoices }: { deal: Deal; onSave: (deal: Deal) => Promise<string | null>; invoices: Invoice[] }) {
+function DealDetails({ deal, onSave, onDealUpdated, invoices }: { deal: Deal; onSave: (deal: Deal) => Promise<string | null>; onDealUpdated: (deal: Deal) => void; invoices: Invoice[] }) {
   const [copyNotice, setCopyNotice] = useState("");
   const [newNote, setNewNote] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
@@ -492,14 +493,15 @@ function DealDetails({ deal, onSave, invoices }: { deal: Deal; onSave: (deal: De
         </dl>
         {statusError && <p role="alert" className="mt-2 w-full text-xs text-red-700">{statusError}</p>}
       </div>
+      {deal.assignedByUserId && <DealNegotiation key={`${deal.id}-${deal.acceptanceStatus ?? "pending"}`} deal={deal} onDealUpdated={onDealUpdated} />}
       <div className="grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">
         <div className="space-y-4">
         <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <h4 className="font-semibold">Deliverables</h4>
-            <button type="button" onClick={(event) => { event.stopPropagation(); setEditingDeliverables(current => !current); }} className="cursor-pointer text-xs font-medium text-blue-600 hover:underline">
+            {!deal.assignedByUserId && <button type="button" onClick={(event) => { event.stopPropagation(); setEditingDeliverables(current => !current); }} className="cursor-pointer text-xs font-medium text-blue-600 hover:underline">
               {editingDeliverables ? "Done" : "Edit"}
-            </button>
+            </button>}
           </div>
           {deal.deliverables?.length ? <ul className="space-y-2">
             {deal.deliverables.map((item, index) => <li key={index} className={`flex items-center gap-3 rounded-lg px-3 py-3 ${index % 2 ? "bg-[#f0f5ff]" : "bg-[#fcf0fa]"}`}>
@@ -635,7 +637,7 @@ function DealDetails({ deal, onSave, invoices }: { deal: Deal; onSave: (deal: De
   );
 }
 
-function DealActions({ deal, onEdit, onDelete, disabled }: { deal: Deal; onEdit: () => void; onDelete: () => void; disabled: boolean }) {
+function DealActions({ deal, onEdit, onDelete, disabled }: { deal: Deal; onEdit: () => void; onDelete: (() => void) | null; disabled: boolean }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   return (
@@ -669,9 +671,9 @@ function DealActions({ deal, onEdit, onDelete, disabled }: { deal: Deal; onEdit:
           <button type="button" onClick={() => { setOpen(false); onEdit(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-[#101c40] hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">
             Edit
           </button>
-          <button type="button" onClick={() => { setOpen(false); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
+          {onDelete && <button type="button" onClick={() => { setOpen(false); onDelete(); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
             Delete
-          </button>
+          </button>}
         </div>
       </>}
     </>
@@ -788,6 +790,10 @@ function StatusCorner({ deal }: { deal: Deal }) {
 }
 
 function DealStatus({ deal }: { deal: Deal }) {
+  if (deal.assignedByUserId && deal.acceptanceStatus !== "confirmed") {
+    const badge = negotiationBadge(deal);
+    return <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${badge.className}`}><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />{badge.label}</span>;
+  }
   const status = getDealStatus(deal);
   const colors = {
     Settled: "bg-emerald-50 text-emerald-700",
@@ -813,6 +819,7 @@ function DealEditor({ deal, onSave, onCancel }: {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deliverables, setDeliverables] = useState<Deliverable[]>(() => (deal.deliverables ?? []).map(item => ({ ...item })));
+  const locked = Boolean(deal.assignedByUserId);
 
   const inputClass = "mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-600";
   return (
@@ -863,11 +870,12 @@ function DealEditor({ deal, onSave, onCancel }: {
       <fieldset disabled={saving}>
       <h3 className="mb-3 font-semibold">{deal.brand ? "Edit deal & progress" : "Add brand deal"}</h3>
       <p className="mb-3 text-xs text-[#53668e]">Deal date must be today or earlier. Content due can be in the future.</p>
+      {locked && <p className="mb-3 text-xs text-[#53668e]">Your manager set the brand, amount, dates and deliverable list. You can update progress, notes and contact details.</p>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="text-xs text-[#405579]">Brand<input autoFocus name="brand" required maxLength={120} defaultValue={deal.brand} className={inputClass} /></label>
-        <label className="text-xs text-[#405579]">Amount (₹)<input name="amount" type="number" required min="0" step="0.01" defaultValue={deal.amount} className={inputClass} /></label>
-        <label className="text-xs text-[#405579]">Deal date<input name="dealDate" type="date" required min="0001-01-01" max={todayDate()} defaultValue={deal.dealDate} className={inputClass} /></label>
-        <label className="text-xs text-[#405579]">Content due<input name="dueDate" type="date" required min="0001-01-01" max="9999-12-31" defaultValue={deal.dueDate} className={inputClass} /></label>
+        <label className="text-xs text-[#405579]">Brand<input autoFocus name="brand" required readOnly={locked} maxLength={120} defaultValue={deal.brand} className={inputClass} /></label>
+        <label className="text-xs text-[#405579]">Amount (₹)<input name="amount" type="number" required readOnly={locked} min="0" step="0.01" defaultValue={deal.amount} className={inputClass} /></label>
+        <label className="text-xs text-[#405579]">Deal date<input name="dealDate" type="date" required readOnly={locked} min="0001-01-01" max={todayDate()} defaultValue={deal.dealDate} className={inputClass} /></label>
+        <label className="text-xs text-[#405579]">Content due<input name="dueDate" type="date" required readOnly={locked} min="0001-01-01" max="9999-12-31" defaultValue={deal.dueDate} className={inputClass} /></label>
       </div>
       <fieldset className="mt-4 grid gap-4 sm:grid-cols-2">
         <legend className="mb-3 text-sm font-medium">Brand and contact details (optional)</legend>
@@ -888,18 +896,18 @@ function DealEditor({ deal, onSave, onCancel }: {
           {deliverables.map((item, index) => (
             <div key={index} className="flex flex-wrap items-end gap-3">
               <label className="text-xs text-[#405579]">Type
-                <select aria-label={`Deliverable ${index + 1} type`} value={item.type} onChange={(event) => setDeliverables(current => current.map((entry, i) => i === index ? { ...entry, type: event.target.value as Deliverable["type"] } : entry))} className={inputClass}>
+                <select aria-label={`Deliverable ${index + 1} type`} disabled={locked} value={item.type} onChange={(event) => setDeliverables(current => current.map((entry, i) => i === index ? { ...entry, type: event.target.value as Deliverable["type"] } : entry))} className={inputClass}>
                   {["Reel", "Story", "Post", "Ad Rights", "Other"].map(type => <option key={type}>{type}</option>)}
                 </select>
               </label>
               <label className="w-24 text-xs text-[#405579]">{item.type === "Ad Rights" ? "Months" : "Quantity"}
-                <input aria-label={`Deliverable ${index + 1} ${item.type === "Ad Rights" ? "months" : "quantity"}`} type="number" required min="1" max="999" step="1" value={Number.isNaN(item.quantity) ? "" : item.quantity} onChange={(event) => setDeliverables(current => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.valueAsNumber } : entry))} className={inputClass} />
+                <input aria-label={`Deliverable ${index + 1} ${item.type === "Ad Rights" ? "months" : "quantity"}`} type="number" required disabled={locked} min="1" max="999" step="1" value={Number.isNaN(item.quantity) ? "" : item.quantity} onChange={(event) => setDeliverables(current => current.map((entry, i) => i === index ? { ...entry, quantity: event.target.valueAsNumber } : entry))} className={inputClass} />
               </label>
-              <button type="button" aria-label={`Remove deliverable ${index + 1}`} onClick={() => setDeliverables(current => current.filter((_, i) => i !== index))} className="cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">Remove</button>
+              <button type="button" aria-label={`Remove deliverable ${index + 1}`} disabled={locked} onClick={() => setDeliverables(current => current.filter((_, i) => i !== index))} className="cursor-pointer rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">Remove</button>
             </div>
           ))}
         </div>
-        <button type="button" disabled={deliverables.length >= 50} onClick={() => setDeliverables(current => [...current, { type: "Reel", quantity: 1 }])} className="mt-3 cursor-pointer rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-600 disabled:opacity-50">+ Add deliverable</button>
+        <button type="button" disabled={locked || deliverables.length >= 50} onClick={() => setDeliverables(current => [...current, { type: "Reel", quantity: 1 }])} className="mt-3 cursor-pointer rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-blue-600 disabled:opacity-50">+ Add deliverable</button>
       </fieldset>
       <label className="mt-4 block text-xs text-[#405579]">Notes (optional)
         <textarea name="notes" rows={3} maxLength={5000} defaultValue={deal.notes ?? ""} placeholder="Tag the brand, mention the discount code, or describe other deliverables…" className={inputClass} />

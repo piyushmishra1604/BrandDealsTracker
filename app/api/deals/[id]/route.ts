@@ -6,8 +6,15 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const user = await requireCreator();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   const { id } = await params;
+  const supabase = getSupabaseAdmin();
 
-  const { data, error } = await getSupabaseAdmin().from("deals").delete().eq("id", id).eq("user_id", user.sub).select("id");
+  const { data: existing, error: lookupError } = await supabase.from("deals").select("campaignId").eq("id", id).eq("user_id", user.sub).maybeSingle();
+  if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 });
+  if (existing?.campaignId) {
+    return NextResponse.json({ error: "A manager assigned this deal. Ask them to remove the assignment." }, { status: 403 });
+  }
+
+  const { data, error } = await supabase.from("deals").delete().eq("id", id).eq("user_id", user.sub).select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length !== 1) return NextResponse.json({ error: "Deletion was not confirmed. Refresh the page and try again." }, { status: 400 });
   return NextResponse.json({ ok: true });

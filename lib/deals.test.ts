@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import { isAcceptanceStatus, isAssignedDealInput, assignedDealDateError, todayDate } from "./deals";
 
 describe("isAcceptanceStatus", () => {
-  it("accepts the three valid values", () => {
+  it("accepts the five valid values", () => {
     expect(isAcceptanceStatus("pending")).toBe(true);
+    expect(isAcceptanceStatus("countered")).toBe(true);
     expect(isAcceptanceStatus("accepted")).toBe(true);
+    expect(isAcceptanceStatus("confirmed")).toBe(true);
     expect(isAcceptanceStatus("declined")).toBe(true);
   });
 

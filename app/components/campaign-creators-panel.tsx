@@ -6,15 +6,28 @@ import { type Creator } from "@/lib/creators";
 import { type CampaignCreatorEntry } from "@/lib/campaign-creators";
 import { type AssignedDealInput, type Deal, todayDate } from "@/lib/deals";
 import { currencySymbols, type CurrencyCode } from "@/lib/invoices";
+import type { DealOffer } from "@/lib/assigned-deal-store";
+
+const offerEventLabels: Record<DealOffer["event"], string> = {
+  offer: "sent an offer of",
+  counter: "countered with",
+  accept: "accepted",
+  confirm: "confirmed",
+  decline: "declined",
+};
 
 const acceptanceLabels: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
   pending: "Pending",
+  countered: "Counter offer",
   accepted: "Accepted",
+  confirmed: "Confirmed",
   declined: "Declined",
 };
 const acceptanceColors: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
   pending: "bg-amber-50 text-amber-700",
+  countered: "bg-violet-50 text-violet-700",
   accepted: "bg-emerald-50 text-emerald-700",
+  confirmed: "bg-emerald-100 text-emerald-800",
   declined: "bg-red-50 text-red-700",
 };
 
@@ -33,6 +46,8 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
   const [dealNotes, setDealNotes] = useState("");
   const [savingDeal, setSavingDeal] = useState(false);
   const [dealError, setDealError] = useState("");
+  const [dealOfferNote, setDealOfferNote] = useState("");
+  const [offersByCreator, setOffersByCreator] = useState<Record<string, DealOffer[]>>({});
 
   useEffect(() => {
     let active = true;
@@ -93,7 +108,18 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
     setDealAmount(entry.deal ? String(entry.deal.amount) : "");
     setDealDueDate(entry.deal?.dueDate ?? todayDate());
     setDealNotes(entry.deal?.notes ?? "");
+    setDealOfferNote("");
     setDealError("");
+    if (entry.deal) void loadOffers(entry.creatorId);
+  }
+
+  async function loadOffers(creatorId: string) {
+    try {
+      const response = await fetch(`/api/manager/campaigns/${campaignId}/creators/${creatorId}/deals/negotiation`);
+      const body = await response.json();
+      if (!response.ok) { setDealError(body.error ?? "Could not load the offer history."); return; }
+      setOffersByCreator(current => ({ ...current, [creatorId]: body.offers }));
+    } catch { setDealError("Could not load the offer history. Check your connection and try again."); }
   }
 
   async function saveDeal(creatorId: string) {
@@ -103,7 +129,9 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
     setSavingDeal(true);
     setDealError("");
     try {
-      const input: AssignedDealInput = { amount, dueDate: dealDueDate, notes: dealNotes.trim() || undefined };
+      const input: AssignedDealInput & { note?: string } = {
+        amount, dueDate: dealDueDate, notes: dealNotes.trim() || undefined, note: dealOfferNote.trim() || undefined,
+      };
       const response = await fetch(`/api/manager/campaigns/${campaignId}/creators/${creatorId}/deals`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
       });
@@ -111,6 +139,24 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
       if (!response.ok) { setDealError(body.error ?? "Could not save this deal."); return; }
       setEntries(current => current.map(entry => entry.creatorId === creatorId ? { ...entry, deal: body.deal } : entry));
       setEditingDealFor(null);
+    } catch { setDealError("Could not reach the server. Check your connection and try again."); }
+    finally { setSavingDeal(false); }
+  }
+
+  async function confirmDeal(creatorId: string) {
+    setSavingDeal(true);
+    setDealError("");
+    try {
+      const response = await fetch(`/api/manager/campaigns/${campaignId}/creators/${creatorId}/deals/negotiation`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm", note: dealOfferNote.trim() || undefined }),
+      });
+      const body = await response.json();
+      if (!response.ok) { setDealError(body.error ?? "Could not confirm this deal."); return; }
+      setEntries(current => current.map(entry => entry.creatorId === creatorId ? { ...entry, deal: body.deal } : entry));
+      setDealOfferNote("");
+      setDealAmount(String(body.deal.amount));
+      void loadOffers(creatorId);
     } catch { setDealError("Could not reach the server. Check your connection and try again."); }
     finally { setSavingDeal(false); }
   }
@@ -210,7 +256,7 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                       <div className="flex flex-wrap items-end gap-3">
                         <label className="flex flex-col gap-1 text-xs font-medium text-[#405579]">
                           Amount ({symbol})
-                          <input type="number" min="0" step="0.01" value={dealAmount} onChange={(event) => setDealAmount(event.target.value)} className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                          <input type="number" min="0" step="0.01" value={dealAmount} disabled={entry.deal?.acceptanceStatus === "accepted"} onChange={(event) => setDealAmount(event.target.value)} className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-500" />
                         </label>
                         <label className="flex flex-col gap-1 text-xs font-medium text-[#405579]">
                           Due Date
@@ -220,12 +266,40 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                           Notes (optional)
                           <input type="text" value={dealNotes} onChange={(event) => setDealNotes(event.target.value)} maxLength={5000} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
                         </label>
+                        <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-[#405579]">
+                          Message to creator (optional)
+                          <input type="text" value={dealOfferNote} onChange={(event) => setDealOfferNote(event.target.value)} maxLength={500} placeholder="Sent with your next offer" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                        </label>
                         <button type="button" onClick={() => void saveDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                           {savingDeal ? "Saving…" : "Save Deal"}
                         </button>
+                        {(entry.deal?.acceptanceStatus === "accepted" || entry.deal?.acceptanceStatus === "countered") && (
+                          <button type="button" onClick={() => void confirmDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                            {entry.deal.acceptanceStatus === "countered" ? "Accept counter-offer" : "Confirm amount"}
+                          </button>
+                        )}
                         <button type="button" onClick={() => setEditingDealFor(null)} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">Cancel</button>
                         {entry.deal && (
                           <button type="button" onClick={() => void removeDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">Remove Deal</button>
+                        )}
+                      </div>
+                      <div className="mt-4 border-t border-[#e5ebf5] pt-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#405579]">Offer history</p>
+                        {!entry.deal ? (
+                          <p className="mt-2 text-sm text-[#53668e]">Save a deal to start the negotiation.</p>
+                        ) : (offersByCreator[entry.creatorId] ?? []).length === 0 ? (
+                          <p className="mt-2 text-sm text-[#53668e]">No offers recorded yet.</p>
+                        ) : (
+                          <ol className="mt-2 space-y-2">
+                            {(offersByCreator[entry.creatorId] ?? []).map((offer, index) => (
+                              <li key={`${offer.created_at}-${index}`} className="text-sm">
+                                <span className="font-medium">{offer.actor === "manager" ? "You" : entry.creator?.name ?? "Creator"}</span>{" "}
+                                {offerEventLabels[offer.event]} {offer.event !== "accept" && offer.event !== "decline" && offer.event !== "confirm" ? `${symbol}${offer.amount.toLocaleString()}` : ""}
+                                <span className="ml-2 text-xs text-[#53668e]">{new Date(offer.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                                {offer.note && <p className="mt-0.5 text-[#405579]">&ldquo;{offer.note}&rdquo;</p>}
+                              </li>
+                            ))}
+                          </ol>
                         )}
                       </div>
                       {dealError && <p role="alert" className="mt-2 text-sm text-red-700">{dealError}</p>}
