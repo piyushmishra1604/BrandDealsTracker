@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard, Megaphone, Users, Handshake as DealsIcon, Mail, FileText, BarChart3, UsersRound, Settings, UserPlus, BadgeCheck } from "lucide-react";
+import { LayoutDashboard, Megaphone, Users, Mail, FileText, BarChart3, UsersRound, Settings, UserPlus, BadgeCheck } from "lucide-react";
 import { NavShell, type NavItem } from "./nav-shell";
 
 const navigation: NavItem[] = [
   { label: "Dashboard", href: "/manager", icon: LayoutDashboard, tint: "text-blue-600 bg-blue-50" },
   { label: "Campaigns", href: "/manager/campaigns", icon: Megaphone, tint: "text-purple-600 bg-purple-50" },
   { label: "Creators", href: "/manager/creators", icon: Users, tint: "text-teal-600 bg-teal-50" },
-  { label: "Creator Management", href: "/manager/creator-management", icon: BadgeCheck, tint: "text-indigo-600 bg-indigo-50" },
-  { label: "Deals", href: null, icon: DealsIcon, tint: "text-brand-600 bg-brand-50" },
+  { label: "Talent Management", href: "/manager/creator-management", icon: BadgeCheck, tint: "text-indigo-600 bg-indigo-50" },
   { label: "Outreach", href: null, icon: Mail, tint: "text-pink-600 bg-pink-50" },
   { label: "Invoices", href: null, icon: FileText, tint: "text-amber-600 bg-amber-50" },
   { label: "Analytics", href: null, icon: BarChart3, tint: "text-cyan-600 bg-cyan-50" },

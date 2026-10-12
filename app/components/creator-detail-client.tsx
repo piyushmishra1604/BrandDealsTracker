@@ -33,7 +33,7 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
       const body = await response.json();
       if (!response.ok) { setNotice(body.error ?? "Could not change the relationship."); return; }
       setCreator(body.creator);
-      setNotice(relationship === "managed" ? "Creator is now managed. They appear in Creator Management." : "Creator is now external. Their deal history is unchanged.");
+      setNotice(relationship === "managed" ? "Creator is now managed. They appear in Talent Management." : "Creator is now external. Their deal history is unchanged.");
     } catch { setNotice("Could not reach the server. Check your connection and try again."); }
   }
 
@@ -81,6 +81,8 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
         </div>
       ) : (
         <div className="space-y-6">
+          <CreatorDealDashboard creatorId={creator.id} />
+
           <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
             <div className="flex items-center justify-between gap-4 border-b border-[#e5ebf5] px-5 py-5">
               <h2 className="text-lg font-bold">Profile</h2>
@@ -105,7 +107,7 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
               <h2 className="text-lg font-bold">Relationship</h2>
               <p className="mt-1 text-sm text-[#53668e]">
                 {creator.relationship === "managed"
-                  ? "Managed creators appear in Creator Management, with every deal across your campaigns."
+                  ? "Managed creators appear in Talent Management, with every deal across your campaigns."
                   : "External creators stay in your directory so you can reuse them in future campaigns."}
               </p>
               {creator.relationship !== "managed" && promoteBlockedReason && (
@@ -126,8 +128,6 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
           <LinkAccountCard creator={creator} linkedEmail={linkedEmail} onLinked={(updated) => { setCreator(updated); setNotice("Creator linked to their account."); }} />
 
           <CreatorInvitationCard creator={creator} />
-
-          <CreatorDealDashboard creatorId={creator.id} />
         </div>
       )}
     </div>

@@ -6,7 +6,7 @@ export const creatorStatusLabels: Record<CreatorStatus, string> = {
 };
 
 // "external" creators are contacts kept for future campaigns. "managed" creators are
-// linked to a CollabFlow account and show up in Creator Management (M4).
+// linked to a CollabFlow account and show up in Talent Management (M4).
 export type CreatorRelationship = "external" | "managed";
 export const creatorRelationshipLabels: Record<CreatorRelationship, string> = {
   external: "External",
