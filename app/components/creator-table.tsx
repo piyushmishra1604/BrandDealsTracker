@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AtSign, Mail, Phone, Tag } from "lucide-react";
 import { type CreatorStatus, type CreatorSummary } from "@/lib/creators";
@@ -70,6 +71,9 @@ function CreatorDetails({ creator }: { creator: CreatorSummary }) {
       <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Phone className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Phone</dt><dd className="mt-1 text-sm font-medium">{creator.phone || "—"}</dd></div>
       <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Tag className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Category</dt><dd className="mt-1 text-sm font-medium">{creator.category || "—"}</dd></div>
       {creator.notes && <div className="sm:col-span-3"><dt className="text-xs text-[#53668e]">Notes</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{creator.notes}</dd></div>}
+      <div className="sm:col-span-3">
+        <Link href={`/manager/creators/${creator.id}`} className="text-sm font-semibold text-brand-600 hover:underline">Open full page</Link>
+      </div>
     </dl>
   );
 }
@@ -137,7 +141,9 @@ export function CreatorTable({ creators, emptyMessage, onSetArchived }: {
                 <td className="whitespace-nowrap px-5 py-4 tabular-nums text-[#53668e]">{creator.campaignCount ?? 0}</td>
                 <td className="whitespace-nowrap px-5 py-4 tabular-nums text-[#53668e]">{creator.dealCount ?? 0}</td>
                 <td className="px-3 py-2">
-                  <CreatorActions creator={creator} onSetArchived={toggleArchived} />
+                  <div className="flex items-center justify-end gap-1">
+                    <CreatorActions creator={creator} onSetArchived={toggleArchived} />
+                  </div>
                 </td>
               </tr>
               <tr id={`creator-details-${creator.id}`} hidden={expandedId !== creator.id} className="border-t border-[#edf1f8] bg-[#f8faff]">

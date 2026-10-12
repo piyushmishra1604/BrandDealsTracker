@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { LayoutDashboard, Megaphone, Users, Mail, FileText, BarChart3, UsersRound, Settings, UserPlus, BadgeCheck } from "lucide-react";
+import { LayoutDashboard, Megaphone, Users, Mail, FileText, BarChart3, UsersRound, Settings, BadgeCheck } from "lucide-react";
 import { NavShell, type NavItem } from "./nav-shell";
 
 const navigation: NavItem[] = [
@@ -22,12 +21,6 @@ export function ManagerSidebar({ workspaceName }: { workspaceName: string }) {
       brand={workspaceName}
       subtitle="Manager Workspace"
       navigation={navigation}
-      footerExtra={
-        <Link href="/manager/creators/new" className="mt-3 block shrink-0 rounded-xl border border-dashed border-brand-200 bg-brand-50/60 p-3 text-xs transition-colors hover:bg-brand-50">
-          <span className="flex items-center gap-2 font-semibold text-brand-700"><UserPlus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />Invite Creators</span>
-          <span className="mt-1 block text-[#53668e]">Add creators to your workspace</span>
-        </Link>
-      }
     />
   );
 }

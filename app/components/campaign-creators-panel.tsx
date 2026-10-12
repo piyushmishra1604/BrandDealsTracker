@@ -1,12 +1,14 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { UserPlus, X, Pencil } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, ChevronDown, ChevronRight, UserPlus, X, Pencil } from "lucide-react";
 import { type Creator } from "@/lib/creators";
 import { type CampaignCreatorEntry } from "@/lib/campaign-creators";
 import { type AssignedDealInput, type Deal, todayDate } from "@/lib/deals";
 import { currencySymbols, type CurrencyCode } from "@/lib/invoices";
 import type { DealOffer } from "@/lib/assigned-deal-store";
+import { CreatorDealDashboard } from "./creator-deal-dashboard";
 
 const offerEventLabels: Record<DealOffer["event"], string> = {
   offer: "sent an offer of",
@@ -43,6 +45,7 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
   const [adding, setAdding] = useState(false);
 
   const [editingDealFor, setEditingDealFor] = useState<string | null>(null);
+  const [expandedCreatorId, setExpandedCreatorId] = useState<string | null>(null);
   const [dealAmount, setDealAmount] = useState("");
   const [dealDueDate, setDealDueDate] = useState("");
   const [dealNotes, setDealNotes] = useState("");
@@ -223,6 +226,9 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
               <Fragment key={entry.id}>
                 <tr className="border-t border-[#edf1f8]">
                   <td className="whitespace-nowrap px-5 py-4 font-medium">
+                    <button type="button" onClick={() => setExpandedCreatorId(expandedCreatorId === entry.creatorId ? null : entry.creatorId)} aria-label={`${expandedCreatorId === entry.creatorId ? "Hide" : "Show"} deals for ${entry.creator?.name ?? "creator"}`} aria-expanded={expandedCreatorId === entry.creatorId} className="mr-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-slate-500 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-600">
+                      {expandedCreatorId === entry.creatorId ? <ChevronDown className="h-4 w-4" strokeWidth={2} aria-hidden="true" /> : <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />}
+                    </button>
                     {entry.creator?.name ?? "—"}
                     {entry.creator?.instagramHandle && <span className="ml-1.5 font-normal text-[#53668e]">{entry.creator.instagramHandle}</span>}
                   </td>
@@ -303,6 +309,19 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                         )}
                       </div>
                       {dealError && <p role="alert" className="mt-2 text-sm text-red-700">{dealError}</p>}
+                    </td>
+                  </tr>
+                )}
+                {expandedCreatorId === entry.creatorId && (
+                  <tr className="border-t border-[#edf1f8] bg-[#f8faff]">
+                    <td colSpan={6} className="px-5 py-5">
+                      <div className="mb-4 flex items-center justify-between gap-4">
+                        <p className="text-sm font-semibold text-[#101c40]">{entry.creator?.name ?? "Creator"}&rsquo;s deals</p>
+                        <Link href={`/manager/creators/${entry.creatorId}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700">
+                          Open full page <ArrowUpRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                        </Link>
+                      </div>
+                      <CreatorDealDashboard creatorId={entry.creatorId} />
                     </td>
                   </tr>
                 )}

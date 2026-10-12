@@ -11,7 +11,7 @@ import { LinkAccountCard } from "./link-account-card";
 import { CreatorInvitationCard } from "./creator-invitation-card";
 import { CreatorDealDashboard } from "./creator-deal-dashboard";
 
-export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { creator: Creator; linkedEmail?: string | null }) {
+export function CreatorDetailClient({ creator: initialCreator }: { creator: Creator }) {
   const [creator, setCreator] = useState(initialCreator);
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState("");
@@ -125,7 +125,9 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
             )}
           </section>
 
-          <LinkAccountCard creator={creator} linkedEmail={linkedEmail} onLinked={(updated) => { setCreator(updated); setNotice("Creator linked to their account."); }} />
+          {creator.status !== "linked" && (
+            <LinkAccountCard creator={creator} onLinked={(updated) => { setCreator(updated); setNotice("Creator linked to their account."); }} />
+          )}
 
           <CreatorInvitationCard creator={creator} />
         </div>

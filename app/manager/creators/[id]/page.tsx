@@ -15,11 +15,5 @@ export default async function CreatorDetailPage({ params }: { params: Promise<{ 
   const access = await requireWorkspaceAccess(creator.workspaceId);
   if (!access) notFound();
 
-  let linkedEmail: string | null = null;
-  if (creator.linkedUserId) {
-    const { data: account } = await supabase.from("app_users").select("email").eq("id", creator.linkedUserId).maybeSingle();
-    linkedEmail = account?.email ?? null;
-  }
-
-  return <CreatorDetailClient creator={creator as Creator} linkedEmail={linkedEmail} />;
+  return <CreatorDetailClient creator={creator as Creator} />;
 }

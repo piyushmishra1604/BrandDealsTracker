@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Link2, CheckCircle2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { type Creator } from "@/lib/creators";
 
 const inputClass = "mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm transition-colors focus:border-brand-400 focus:outline-2 focus:outline-brand-500";
@@ -9,7 +9,7 @@ const inputClass = "mt-1 block w-full rounded-lg border border-slate-200 bg-whit
 // Temporary stand-in for real invitations (WP4.4, deferred to last): the manager must
 // already know the creator's registered email, looks it up, and explicitly confirms
 // the link — no email is sent and the creator isn't asked to accept anything yet.
-export function LinkAccountCard({ creator, linkedEmail, onLinked }: { creator: Creator; linkedEmail?: string | null; onLinked: (creator: Creator) => void }) {
+export function LinkAccountCard({ creator, onLinked }: { creator: Creator; onLinked: (creator: Creator) => void }) {
   const [email, setEmail] = useState("");
   const [found, setFound] = useState<{ id: string; email: string } | null>(null);
   const [looking, setLooking] = useState(false);
@@ -40,18 +40,6 @@ export function LinkAccountCard({ creator, linkedEmail, onLinked }: { creator: C
       onLinked(body.creator);
     } catch { setError("Could not reach the server. Check your connection and try again."); }
     finally { setLinking(false); }
-  }
-
-  if (creator.status === "linked") {
-    return (
-      <section className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
-        <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
-          <CheckCircle2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          Linked to a registered creator account
-        </p>
-        {linkedEmail && <p className="mt-1 text-sm text-emerald-700/80">{linkedEmail}</p>}
-      </section>
-    );
   }
 
   return (

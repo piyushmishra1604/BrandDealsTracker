@@ -1,11 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { type CreatorSummary } from "@/lib/creators";
 import { CloudCreators } from "./cloud-creators";
-import { CreatorStatusBadge } from "./creator-status-badge";
-import { CreatorRelationshipBadge } from "./creator-relationship-badge";
+import { CreatorTable } from "./creator-table";
 
 type View = "managed" | "all";
 
@@ -31,7 +28,7 @@ export function CreatorManagementClient({ workspaceId }: { workspaceId: string }
       </div>
 
       <CloudCreators workspaceId={workspaceId}>
-        {(creators) => {
+        {(creators, _save, setArchived) => {
           const managed = creators.filter(creator => creator.relationship === "managed" && !creator.archivedAt);
           const activeDeals = managed.reduce((sum, creator) => sum + (creator.activeDealCount ?? 0), 0);
           const committed = managed.reduce((sum, creator) => sum + (creator.activeDealValue ?? 0) + (creator.completedDealValue ?? 0), 0);
@@ -77,7 +74,11 @@ export function CreatorManagementClient({ workspaceId }: { workspaceId: string }
                       : "No creators to show."}
                   </p>
                 ) : (
-                  <RosterTable creators={visible} />
+                  <CreatorTable
+                    creators={visible}
+                    emptyMessage="No creators to show."
+                    onSetArchived={setArchived}
+                  />
                 )}
               </section>
             </>
@@ -93,43 +94,6 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
       <p className="text-xs font-medium uppercase tracking-wide text-[#53668e]">{label}</p>
       <p className="mt-2 text-2xl font-bold tabular-nums text-[#101c40]">{value}</p>
-    </div>
-  );
-}
-
-function RosterTable({ creators }: { creators: CreatorSummary[] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-[#f7f9fd] text-xs uppercase tracking-wide text-[#53668e]">
-          <tr>
-            <th scope="col" className="px-5 py-3 font-semibold">Creator</th>
-            <th scope="col" className="px-5 py-3 font-semibold">Relationship</th>
-            <th scope="col" className="px-5 py-3 font-semibold">Account</th>
-            <th scope="col" className="px-5 py-3 text-right font-semibold">Campaigns</th>
-            <th scope="col" className="px-5 py-3 text-right font-semibold">Active deals</th>
-            <th scope="col" className="px-5 py-3 text-right font-semibold">Active value</th>
-            <th scope="col" className="px-5 py-3 text-right font-semibold">Completed</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#e5ebf5]">
-          {creators.map(creator => (
-            <tr key={creator.id} className="hover:bg-slate-50">
-              <td className="px-5 py-4">
-                <Link href={`/manager/creators/${creator.id}`} className="font-semibold text-[#101c40] hover:text-brand-700">{creator.name}</Link>
-                {creator.archivedAt && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Archived</span>}
-                {creator.instagramHandle && <p className="text-xs text-[#53668e]">{creator.instagramHandle}</p>}
-              </td>
-              <td className="whitespace-nowrap px-5 py-4"><CreatorRelationshipBadge relationship={creator.relationship} /></td>
-              <td className="whitespace-nowrap px-5 py-4"><CreatorStatusBadge status={creator.status} /></td>
-              <td className="px-5 py-4 text-right tabular-nums">{creator.campaignCount ?? 0}</td>
-              <td className="px-5 py-4 text-right tabular-nums">{creator.activeDealCount ?? 0}</td>
-              <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums">{formatMoney(creator.activeDealValue ?? 0)}</td>
-              <td className="px-5 py-4 text-right tabular-nums">{creator.completedDealCount ?? 0}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
