@@ -37,6 +37,7 @@ const WAITING_MESSAGES: Record<AcceptanceStatus, string> = {
   accepted: "You have accepted this amount. Waiting for the manager to confirm it.",
   confirmed: "This deal is confirmed.",
   declined: "You declined this offer. Waiting for the manager to send a new one.",
+  manual: "",
 };
 
 export function creatorTransition(input: {
@@ -85,12 +86,13 @@ export function managerConfirmTransition(status: AcceptanceStatus, amount: numbe
 // (brand, amount, dates, deliverable structure, assignment and status fields) is set by the
 // manager, so the server must reject any attempt to change it.
 export const CREATOR_LOCKED_ASSIGNED_FIELDS = [
-  "brand", "amount", "dealDate", "dueDate", "workspaceId", "campaignId", "assignedByUserId", "acceptanceStatus",
+  "brand", "amount", "dealDate", "dueDate", "workspaceId", "campaignId", "creatorId", "assignedByUserId", "acceptanceStatus",
 ] as const;
 
 export const UNASSIGNED_DEAL_FIELDS = {
   workspaceId: null,
   campaignId: null,
+  creatorId: null,
   assignedByUserId: null,
   acceptanceStatus: null,
 } as const;

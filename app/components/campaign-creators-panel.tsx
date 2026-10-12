@@ -22,6 +22,7 @@ const acceptanceLabels: Record<NonNullable<Deal["acceptanceStatus"]>, string> = 
   accepted: "Accepted",
   confirmed: "Confirmed",
   declined: "Declined",
+  manual: "Manual",
 };
 const acceptanceColors: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
   pending: "bg-amber-50 text-amber-700",
@@ -29,6 +30,7 @@ const acceptanceColors: Record<NonNullable<Deal["acceptanceStatus"]>, string> = 
   accepted: "bg-emerald-50 text-emerald-700",
   confirmed: "bg-emerald-100 text-emerald-800",
   declined: "bg-red-50 text-red-700",
+  manual: "bg-slate-100 text-slate-700",
 };
 
 export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCountChange, onDealsChange }: { campaignId: string; workspaceId: string; currency: CurrencyCode; onCountChange?: (count: number) => void; onDealsChange?: (count: number, totalValue: number) => void }) {

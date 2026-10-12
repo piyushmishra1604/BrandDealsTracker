@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!existing) {
     return createAssignedDeal({
-      supabase, campaign, managerUserId: access.sub, campaignId: id, linkedUserId: creator.linkedUserId, input: body, offerNote,
+      supabase, campaign, managerUserId: access.sub, campaignId: id, creatorProfileId: creator.id, linkedUserId: creator.linkedUserId, input: body, offerNote,
     });
   }
 
@@ -58,11 +58,12 @@ async function createAssignedDeal(input: {
   campaign: { workspaceId: string; brand: string };
   managerUserId: string;
   campaignId: string;
+  creatorProfileId: string;
   linkedUserId: string;
   input: ManagerAssignmentInput;
   offerNote: string;
 }) {
-  const { supabase, campaign, managerUserId, campaignId, linkedUserId, offerNote } = input;
+  const { supabase, campaign, managerUserId, campaignId, creatorProfileId, linkedUserId, offerNote } = input;
   const { data, error } = await supabase.from("deals").insert({
     ...managerAssignedFields(null, input.input, campaign.brand),
     dealDate: todayDate(),
@@ -72,6 +73,7 @@ async function createAssignedDeal(input: {
     moneyReceived: false,
     workspaceId: campaign.workspaceId,
     campaignId,
+    creatorId: creatorProfileId,
     assignedByUserId: managerUserId,
     acceptanceStatus: "pending",
     user_id: linkedUserId,

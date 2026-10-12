@@ -67,7 +67,7 @@ describe("POST manager assigned deal", () => {
     const response = await POST(makeRequest({ amount: 500, dueDate: "2999-01-01", note: "Please review" }), { params });
     expect(response.status).toBe(200);
     const insert = fake.queries.find(q => q.table === "deals" && q.op === "insert");
-    expect(insert?.payload).toMatchObject({ acceptanceStatus: "pending", user_id: "user-9", assignedByUserId: "manager-1", campaignId: "camp-1", brand: "Nike" });
+    expect(insert?.payload).toMatchObject({ acceptanceStatus: "pending", user_id: "user-9", creatorId: "c1", assignedByUserId: "manager-1", campaignId: "camp-1", brand: "Nike" });
     const offer = fake.queries.find(q => q.table === "deal_offers");
     expect(offer?.payload).toMatchObject({ dealId: "deal-new", actor: "manager", event: "offer", amount: 500, note: "Please review" });
   });

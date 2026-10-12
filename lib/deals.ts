@@ -14,7 +14,7 @@ export function isDeliverables(value: unknown): value is Deliverable[] {
 
 // Only set when a manager assigned this deal from a campaign (M5). The negotiation rules live
 // in assigned-deals.ts; "confirmed" is final, "declined" can be reopened by a new manager offer.
-export type AcceptanceStatus = "pending" | "countered" | "accepted" | "confirmed" | "declined";
+export type AcceptanceStatus = "pending" | "countered" | "accepted" | "confirmed" | "declined" | "manual";
 
 export function isAcceptanceStatus(value: unknown): value is AcceptanceStatus {
   return value === "pending" || value === "countered" || value === "accepted" || value === "confirmed" || value === "declined";
@@ -42,6 +42,7 @@ export type Deal = {
   campaignId?: string | null;
   assignedByUserId?: string | null;
   acceptanceStatus?: AcceptanceStatus | null;
+  creatorId?: string | null;
 };
 
 export function isDate(value: unknown): value is string {

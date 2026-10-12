@@ -22,6 +22,7 @@ const negotiationBadges: Record<AcceptanceStatus, { label: string; className: st
   accepted: { label: "Accepted, awaiting confirmation", className: "bg-blue-50 text-blue-700" },
   confirmed: { label: "Confirmed", className: "bg-emerald-50 text-emerald-700" },
   declined: { label: "Declined", className: "bg-red-50 text-red-700" },
+  manual: { label: "Recorded off-platform", className: "bg-slate-100 text-slate-700" },
 };
 
 export function negotiationBadge(deal: Deal) {
