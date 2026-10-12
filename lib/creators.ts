@@ -12,6 +12,12 @@ export const creatorRelationshipLabels: Record<CreatorRelationship, string> = {
   external: "External",
   managed: "Managed",
 };
+export const creatorRelationships: CreatorRelationship[] = ["external", "managed"];
+export function isCreatorRelationship(value: unknown): value is CreatorRelationship {
+  return typeof value === "string" && (creatorRelationships as string[]).includes(value);
+}
+export const MANAGED_REQUIRES_LINK_MESSAGE = "Link this creator to a CollabFlow account before making them managed.";
+export const MANAGED_REQUIRES_RESTORE_MESSAGE = "Restore this creator before making them managed.";
 
 export type Creator = {
   id: string;
@@ -32,7 +38,13 @@ export type Creator = {
 };
 
 // Directory list rows carry counts so the table can show them without extra requests.
-export type CreatorSummary = Creator & { campaignCount?: number; dealCount?: number };
+// "Active" deals are every deal that isn't declined, so their value is what the agency has committed.
+export type CreatorSummary = Creator & {
+  campaignCount?: number;
+  dealCount?: number;
+  activeDealCount?: number;
+  activeDealValue?: number;
+};
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

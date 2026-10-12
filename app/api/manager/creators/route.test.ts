@@ -11,8 +11,8 @@ const creatorsChain = {
   order: (...args: unknown[]) => mockOrder(...args),
   insert: (...args: unknown[]) => mockInsert(...args),
 };
-// Rows returned for the campaign_creators and deals count queries, keyed by table name.
-const relatedRows: Record<string, { creatorId: string }[]> = {};
+// Rows returned for the campaign_creators and deals queries, keyed by table name.
+const relatedRows: Record<string, Record<string, unknown>[]> = {};
 const relatedChain = (table: string) => ({
   select: () => ({ in: () => Promise.resolve({ data: relatedRows[table] ?? [], error: null }) }),
 });
@@ -40,6 +40,20 @@ describe("GET /api/manager/creators", () => {
     const body = await response.json();
     expect(body.creators[0]).toMatchObject({ id: "c1", campaignCount: 2, dealCount: 1 });
     expect(body.creators[1]).toMatchObject({ id: "c2", campaignCount: 0, dealCount: 0 });
+  });
+
+  it("counts active deals and their value, leaving declined deals out of both", async () => {
+    mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
+    mockOrder.mockResolvedValue({ data: [{ id: "c1", workspaceId: "workspace-a" }], error: null });
+    relatedRows.campaign_creators = [];
+    relatedRows.deals = [
+      { creatorId: "c1", amount: 18000, acceptanceStatus: "confirmed" },
+      { creatorId: "c1", amount: 9000, acceptanceStatus: "pending" },
+      { creatorId: "c1", amount: 5000, acceptanceStatus: "declined" },
+    ];
+    const response = await GET(makeRequest("http://localhost/api/manager/creators?workspaceId=workspace-a"));
+    const body = await response.json();
+    expect(body.creators[0]).toMatchObject({ dealCount: 3, activeDealCount: 2, activeDealValue: 27000 });
   });
 
   it("rejects a request with no workspace access (cross-agency isolation)", async () => {

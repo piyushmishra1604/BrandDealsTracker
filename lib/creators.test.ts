@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isCreatorInput, type CreatorInput } from "./creators";
+import { isCreatorInput, isCreatorRelationship, type CreatorInput } from "./creators";
 
 const validInput: CreatorInput = {
   name: "Ankita Rath",
@@ -46,5 +46,19 @@ describe("isCreatorInput", () => {
   it("rejects a non-object value", () => {
     expect(isCreatorInput(null)).toBe(false);
     expect(isCreatorInput("a string")).toBe(false);
+  });
+});
+
+describe("isCreatorRelationship", () => {
+  it("accepts managed and external", () => {
+    expect(isCreatorRelationship("managed")).toBe(true);
+    expect(isCreatorRelationship("external")).toBe(true);
+  });
+
+  it("rejects anything else, including non-strings", () => {
+    expect(isCreatorRelationship("admin")).toBe(false);
+    expect(isCreatorRelationship("")).toBe(false);
+    expect(isCreatorRelationship(undefined)).toBe(false);
+    expect(isCreatorRelationship(1)).toBe(false);
   });
 });

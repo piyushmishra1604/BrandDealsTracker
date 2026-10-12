@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, Phone, AtSign, Megaphone } from "lucide-react";
-import { type Creator, type CreatorInput } from "@/lib/creators";
+import { type Creator, type CreatorInput, type CreatorRelationship } from "@/lib/creators";
 import { type CampaignCreatorEntry } from "@/lib/campaign-creators";
 import { CreatorStatusBadge } from "./creator-status-badge";
 import { CreatorRelationshipBadge } from "./creator-relationship-badge";
@@ -44,6 +44,17 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
     } catch { setNotice("Could not reach the server. Check your connection and try again."); }
   }
 
+  async function setRelationship(relationship: CreatorRelationship) {
+    setNotice("");
+    try {
+      const response = await fetch(`/api/manager/creators/${creator.id}/relationship`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ relationship }) });
+      const body = await response.json();
+      if (!response.ok) { setNotice(body.error ?? "Could not change the relationship."); return; }
+      setCreator(body.creator);
+      setNotice(relationship === "managed" ? "Creator is now managed. They appear in Creator Management." : "Creator is now external. Their deal history is unchanged.");
+    } catch { setNotice("Could not reach the server. Check your connection and try again."); }
+  }
+
   async function save(input: CreatorInput) {
     try {
       const response = await fetch(`/api/manager/creators/${creator.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
@@ -55,6 +66,10 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
       return null;
     } catch { return "Could not reach the server. Check your connection and try again."; }
   }
+
+  const promoteBlockedReason = !creator.linkedUserId
+    ? "Link a CollabFlow account first. Managed creators need one."
+    : creator.archivedAt ? "Restore this creator before making them managed." : "";
 
   return (
     <div>
@@ -100,6 +115,29 @@ export function CreatorDetailClient({ creator: initialCreator, linkedEmail }: { 
                 <dt className="text-xs text-[#53668e]">Notes</dt>
                 <dd className="mt-1.5 whitespace-pre-wrap text-sm">{creator.notes}</dd>
               </div>
+            )}
+          </section>
+
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
+            <div>
+              <h2 className="text-lg font-bold">Relationship</h2>
+              <p className="mt-1 text-sm text-[#53668e]">
+                {creator.relationship === "managed"
+                  ? "Managed creators appear in Creator Management, with every deal across your campaigns."
+                  : "External creators stay in your directory so you can reuse them in future campaigns."}
+              </p>
+              {creator.relationship !== "managed" && promoteBlockedReason && (
+                <p className="mt-1.5 text-xs font-medium text-amber-700">{promoteBlockedReason}</p>
+              )}
+            </div>
+            {creator.relationship === "managed" ? (
+              <button type="button" onClick={() => setRelationship("external")} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">
+                Stop managing
+              </button>
+            ) : (
+              <button type="button" disabled={!!promoteBlockedReason} onClick={() => setRelationship("managed")} className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
+                Make managed
+              </button>
             )}
           </section>
 

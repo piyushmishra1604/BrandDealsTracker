@@ -9,6 +9,19 @@ function countByCreator(rows: { creatorId: string }[] | null) {
   return counts;
 }
 
+type DealRow = { creatorId: string; amount: number | null; acceptanceStatus: string | null };
+
+// Declined deals stay in the history but don't count as active or as committed value.
+function activeDealTotals(rows: DealRow[] | null) {
+  const totals = new Map<string, { count: number; value: number }>();
+  for (const row of rows ?? []) {
+    if (row.acceptanceStatus === "declined") continue;
+    const current = totals.get(row.creatorId) ?? { count: 0, value: 0 };
+    totals.set(row.creatorId, { count: current.count + 1, value: current.value + (Number(row.amount) || 0) });
+  }
+  return totals;
+}
+
 // Archived creators are included so the directory can show them behind a toggle.
 export async function GET(request: Request) {
   const workspaceId = new URL(request.url).searchParams.get("workspaceId") ?? "";
@@ -29,16 +42,19 @@ export async function GET(request: Request) {
 
   const [campaignLinks, deals] = await Promise.all([
     supabase.from("campaign_creators").select("creatorId").in("creatorId", ids),
-    supabase.from("deals").select("creatorId").in("creatorId", ids),
+    supabase.from("deals").select("creatorId, amount, acceptanceStatus").in("creatorId", ids),
   ]);
   if (campaignLinks.error || deals.error) return NextResponse.json({ error: (campaignLinks.error ?? deals.error)?.message }, { status: 500 });
 
   const campaignCounts = countByCreator(campaignLinks.data as { creatorId: string }[] | null);
   const dealCounts = countByCreator(deals.data as { creatorId: string }[] | null);
+  const activeTotals = activeDealTotals(deals.data as DealRow[] | null);
   const summaries: CreatorSummary[] = creators.map(creator => ({
     ...creator,
     campaignCount: campaignCounts.get(creator.id) ?? 0,
     dealCount: dealCounts.get(creator.id) ?? 0,
+    activeDealCount: activeTotals.get(creator.id)?.count ?? 0,
+    activeDealValue: activeTotals.get(creator.id)?.value ?? 0,
   }));
   return NextResponse.json({ creators: summaries });
 }
