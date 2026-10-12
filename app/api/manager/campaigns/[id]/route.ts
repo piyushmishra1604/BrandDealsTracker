@@ -49,6 +49,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       brand: merged.brand, title: merged.title, budget: merged.budget, currency: merged.currency,
       startDate: merged.startDate, endDate: merged.endDate, status: merged.status, imageUrl: mergedImageUrl ?? null,
       category: merged.category ?? null, description: merged.description ?? null, notes: mergedNotes ?? null,
+      archived: (merged as { archived?: unknown }).archived === true,
     })
     .eq("id", id)
     .select()

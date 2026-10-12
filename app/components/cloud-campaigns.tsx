@@ -49,7 +49,7 @@ export function CloudCampaigns({ workspaceId, children }: {
   // Quick archive action from the list row, without opening the full edit form.
   async function archive(id: string) {
     try {
-      const response = await fetch(`/api/manager/campaigns/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "archived" }) });
+      const response = await fetch(`/api/manager/campaigns/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ archived: true }) });
       const body = await response.json();
       if (!response.ok) return body.error ?? "Could not archive the campaign.";
       setCampaigns(current => [body.campaign, ...current.filter(entry => entry.id !== body.campaign.id)]);

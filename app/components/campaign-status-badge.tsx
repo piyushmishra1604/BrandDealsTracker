@@ -2,10 +2,10 @@ import { campaignStatusLabels, type CampaignStatus } from "@/lib/campaigns";
 
 const colors: Record<CampaignStatus, string> = {
   draft: "bg-amber-50 text-amber-700",
+  created: "bg-sky-50 text-sky-700",
   active: "bg-emerald-50 text-emerald-700",
-  paused: "bg-orange-50 text-orange-700",
+  pending: "bg-orange-50 text-orange-700",
   completed: "bg-brand-50 text-brand-600",
-  archived: "bg-slate-100 text-slate-600",
 };
 
 export function CampaignStatusBadge({ status }: { status: CampaignStatus }) {

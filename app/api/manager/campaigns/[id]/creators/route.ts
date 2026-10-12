@@ -22,7 +22,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const [{ data, error }, { data: deals, error: dealsError }] = await Promise.all([
     authorized.supabase
       .from("campaign_creators")
-      .select("*, creator:creators(id, name, instagramHandle, category, status, linkedUserId)")
+      .select("*, creator:creators(id, name, instagramHandle, category, email, phone, notes, status, linkedUserId)")
       .eq("campaignId", id)
       .order("created_at", { ascending: true }),
     // Deals have no FK to campaign_creators, so the per-creator deal is matched up in JS
@@ -59,7 +59,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { data, error } = await authorized.supabase
     .from("campaign_creators")
     .insert({ campaignId: id, creatorId, workspaceId: authorized.campaign.workspaceId, addedBy: authorized.access.sub })
-    .select("*, creator:creators(id, name, instagramHandle, category, status, linkedUserId)")
+    .select("*, creator:creators(id, name, instagramHandle, category, email, phone, notes, status, linkedUserId)")
     .single();
   if (error) {
     if (error.code === "23505") return NextResponse.json({ error: "This creator is already on the campaign." }, { status: 409 });

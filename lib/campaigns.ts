@@ -1,8 +1,8 @@
 import { isDate } from "./deals";
 import { currencies, type CurrencyCode } from "./invoices";
 
-export type CampaignStatus = "draft" | "active" | "paused" | "completed" | "archived";
-export const campaignStatuses: CampaignStatus[] = ["draft", "active", "paused", "completed", "archived"];
+export type CampaignStatus = "draft" | "created" | "active" | "pending" | "completed";
+export const campaignStatuses: CampaignStatus[] = ["draft", "created", "active", "pending", "completed"];
 
 export type Campaign = {
   id: string;
@@ -14,6 +14,8 @@ export type Campaign = {
   startDate: string;
   endDate: string;
   status: CampaignStatus;
+  // Archiving is separate from status so an archived campaign keeps its last status.
+  archived?: boolean;
   createdBy?: string | null;
   imageUrl?: string | null;
   category?: string | null;
@@ -65,8 +67,8 @@ export function isValidCampaignNotes(value: unknown): value is string {
 
 export const campaignStatusLabels: Record<CampaignStatus, string> = {
   draft: "Draft",
+  created: "Created",
   active: "Active",
-  paused: "Paused",
+  pending: "Pending",
   completed: "Completed",
-  archived: "Archived",
 };

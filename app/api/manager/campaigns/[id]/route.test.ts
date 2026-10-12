@@ -67,7 +67,7 @@ describe("PATCH /api/manager/campaigns/[id]", () => {
   it("rejects an update to a campaign in another agency's workspace", async () => {
     mockMaybeSingle.mockResolvedValue({ data: existingCampaign });
     mockRequireWorkspaceAccess.mockResolvedValue(null);
-    const response = await PATCH(makeRequest({ status: "archived" }), { params });
+    const response = await PATCH(makeRequest({ archived: true }), { params });
     expect(response.status).toBe(404);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
@@ -75,13 +75,13 @@ describe("PATCH /api/manager/campaigns/[id]", () => {
   it("archives via a partial update without requiring the full form again", async () => {
     mockMaybeSingle.mockResolvedValue({ data: existingCampaign });
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
-    const chain = { eq: () => chain, select: () => chain, single: () => Promise.resolve({ data: { ...existingCampaign, status: "archived" }, error: null }) };
+    const chain = { eq: () => chain, select: () => chain, single: () => Promise.resolve({ data: { ...existingCampaign, archived: true }, error: null }) };
     mockUpdate.mockReturnValue(chain);
-    const response = await PATCH(makeRequest({ status: "archived" }), { params });
+    const response = await PATCH(makeRequest({ archived: true }), { params });
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body.campaign.status).toBe("archived");
-    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "archived", brand: "Nike" }));
+    expect(body.campaign.archived).toBe(true);
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ archived: true, status: existingCampaign.status, brand: "Nike" }));
   });
 
   it("rejects a merged result that fails validation", async () => {

@@ -127,7 +127,7 @@ export function CampaignForm({ workspaceId, initial, onSave, onCancel }: {
       <FormSection step={5} icon={Flag} title="Status" description="Where is this campaign at right now?">
         <label className="block text-xs text-[#405579]">Status
           <select value={form.status} onChange={(event) => setForm(current => ({ ...current, status: event.target.value as CampaignStatus }))} className={inputClass}>
-            {campaignStatuses.filter(status => status !== "archived").map((status) => <option key={status} value={status}>{campaignStatusLabels[status]}</option>)}
+            {campaignStatuses.map((status) => <option key={status} value={status}>{campaignStatusLabels[status]}</option>)}
           </select>
         </label>
       </FormSection>

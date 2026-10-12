@@ -10,6 +10,9 @@ export type CampaignCreatorEntry = {
     name: string;
     instagramHandle?: string | null;
     category?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    notes?: string | null;
     status: string;
     linkedUserId?: string | null;
   } | null;

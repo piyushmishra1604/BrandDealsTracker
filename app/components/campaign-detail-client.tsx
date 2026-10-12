@@ -49,7 +49,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: 
   const [savingNotes, setSavingNotes] = useState(false);
   const router = useRouter();
 
-  async function patch(input: Partial<CampaignInput> & { imageUrl?: string | null; notes?: string | null }) {
+  async function patch(input: Partial<CampaignInput> & { imageUrl?: string | null; notes?: string | null; archived?: boolean }) {
     try {
       const response = await fetch(`/api/manager/campaigns/${campaign.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
       const body = await response.json();
@@ -76,7 +76,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: 
   async function archive() {
     if (archiving || !window.confirm(`Archive the "${campaign.title}" campaign? It will no longer appear in your active campaign list.`)) return;
     setArchiving(true);
-    const error = await patch({ status: "archived" });
+    const error = await patch({ archived: true });
     setArchiving(false);
     if (error) { setNotice(error); return; }
     router.push("/manager/campaigns");
@@ -118,7 +118,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: { campaign: 
             {campaign.description && <p className="mt-3 max-w-2xl text-sm text-[#53668e]">{campaign.description}</p>}
             <div className="mt-4 flex flex-wrap gap-2">
               <button type="button" onClick={() => setEditing(true)} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">Edit Campaign</button>
-              {campaign.status !== "archived" && (
+              {!campaign.archived && (
                 <button type="button" onClick={() => void archive()} disabled={archiving} className="cursor-pointer rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">
                   {archiving ? "Archiving…" : "Archive Campaign"}
                 </button>

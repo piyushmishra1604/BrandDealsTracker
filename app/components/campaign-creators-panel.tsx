@@ -5,10 +5,9 @@ import Link from "next/link";
 import { ArrowUpRight, ChevronDown, ChevronRight, UserPlus, X, Pencil } from "lucide-react";
 import { type Creator } from "@/lib/creators";
 import { type CampaignCreatorEntry } from "@/lib/campaign-creators";
-import { type AssignedDealInput, type Deal, todayDate } from "@/lib/deals";
+import { type AssignedDealInput, type Deal, type Deliverable, todayDate } from "@/lib/deals";
 import { currencySymbols, type CurrencyCode } from "@/lib/invoices";
 import type { DealOffer } from "@/lib/assigned-deal-store";
-import { CreatorDealDashboard } from "./creator-deal-dashboard";
 
 const offerEventLabels: Record<DealOffer["event"], string> = {
   offer: "sent an offer of",
@@ -16,6 +15,14 @@ const offerEventLabels: Record<DealOffer["event"], string> = {
   accept: "accepted",
   confirm: "confirmed",
   decline: "declined",
+};
+
+const deliverableLabels: Record<Deliverable["type"], string> = {
+  Reel: "Instagram Reel",
+  Story: "Instagram Stories",
+  Post: "Instagram Post",
+  "Ad Rights": "Ad rights",
+  Other: "Other deliverable",
 };
 
 export const acceptanceLabels: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
@@ -49,10 +56,20 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
   const [dealAmount, setDealAmount] = useState("");
   const [dealDueDate, setDealDueDate] = useState("");
   const [dealNotes, setDealNotes] = useState("");
+  const [dealDeliverables, setDealDeliverables] = useState<Deliverable[]>([]);
+  const [newDeliverableType, setNewDeliverableType] = useState<Deliverable["type"]>("Reel");
+  const [newDeliverableQuantity, setNewDeliverableQuantity] = useState(1);
   const [savingDeal, setSavingDeal] = useState(false);
   const [dealError, setDealError] = useState("");
   const [dealOfferNote, setDealOfferNote] = useState("");
   const [offersByCreator, setOffersByCreator] = useState<Record<string, DealOffer[]>>({});
+  const [savingDeliverables, setSavingDeliverables] = useState(false);
+  const [deliverableError, setDeliverableError] = useState("");
+  const [panelDeliverableType, setPanelDeliverableType] = useState<Deliverable["type"]>("Reel");
+  const [panelDeliverableQuantity, setPanelDeliverableQuantity] = useState(1);
+  const [draftDeliverableFor, setDraftDeliverableFor] = useState<string | null>(null);
+  const [collapsedDeliverables, setCollapsedDeliverables] = useState<Set<string>>(new Set());
+  const [deliverableMenuKey, setDeliverableMenuKey] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -113,6 +130,9 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
     setDealAmount(entry.deal ? String(entry.deal.amount) : "");
     setDealDueDate(entry.deal?.dueDate ?? todayDate());
     setDealNotes(entry.deal?.notes ?? "");
+    setDealDeliverables((entry.deal?.deliverables ?? []).map(item => ({ ...item })));
+    setNewDeliverableType("Reel");
+    setNewDeliverableQuantity(1);
     setDealOfferNote("");
     setDealError("");
     if (entry.deal) void loadOffers(entry.creatorId);
@@ -135,7 +155,7 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
     setDealError("");
     try {
       const input: AssignedDealInput & { note?: string } = {
-        amount, dueDate: dealDueDate, notes: dealNotes.trim() || undefined, note: dealOfferNote.trim() || undefined,
+        amount, dueDate: dealDueDate, notes: dealNotes.trim() || undefined, deliverables: dealDeliverables, note: dealOfferNote.trim() || undefined,
       };
       const response = await fetch(`/api/manager/campaigns/${campaignId}/creators/${creatorId}/deals`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
@@ -164,6 +184,37 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
       void loadOffers(creatorId);
     } catch { setDealError("Could not reach the server. Check your connection and try again."); }
     finally { setSavingDeal(false); }
+  }
+
+  async function saveDeliverables(entry: CampaignCreatorEntry, deliverables: Deliverable[]) {
+    setSavingDeliverables(true);
+    setDeliverableError("");
+    try {
+      const response = await fetch(`/api/manager/campaigns/${campaignId}/creators/${entry.creatorId}/deals`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deliverables }),
+      });
+      const body = await response.json();
+      if (!response.ok) { setDeliverableError(body.error ?? "Could not update the deliverables."); return; }
+      setEntries(current => current.map(item => item.creatorId === entry.creatorId ? { ...item, deal: body.deal } : item));
+    } catch { setDeliverableError("Could not reach the server. Check your connection and try again."); }
+    finally { setSavingDeliverables(false); }
+  }
+
+  function toggleDeliverable(entry: CampaignCreatorEntry, index: number) {
+    if (!entry.deal?.deliverables) return;
+    void saveDeliverables(entry, entry.deal.deliverables.map((item, i) => i === index ? { ...item, done: !item.done } : item));
+  }
+
+  function removePanelDeliverable(entry: CampaignCreatorEntry, index: number) {
+    if (!entry.deal?.deliverables) return;
+    void saveDeliverables(entry, entry.deal.deliverables.filter((_, i) => i !== index));
+  }
+
+  function addPanelDeliverable(entry: CampaignCreatorEntry) {
+    const current = entry.deal?.deliverables ?? [];
+    if (current.length >= 50) return;
+    void saveDeliverables(entry, [...current, { type: panelDeliverableType, quantity: panelDeliverableQuantity }]);
+    setPanelDeliverableQuantity(1);
   }
 
   async function removeDeal(creatorId: string) {
@@ -224,9 +275,9 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
             )}
             {entries.map((entry) => (
               <Fragment key={entry.id}>
-                <tr className="border-t border-[#edf1f8]">
+                <tr onClick={() => setExpandedCreatorId(expandedCreatorId === entry.creatorId ? null : entry.creatorId)} className="cursor-pointer border-t border-[#edf1f8] hover:bg-[#f8faff]">
                   <td className="whitespace-nowrap px-5 py-4 font-medium">
-                    <button type="button" onClick={() => setExpandedCreatorId(expandedCreatorId === entry.creatorId ? null : entry.creatorId)} aria-label={`${expandedCreatorId === entry.creatorId ? "Hide" : "Show"} deals for ${entry.creator?.name ?? "creator"}`} aria-expanded={expandedCreatorId === entry.creatorId} className="mr-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-slate-500 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-600">
+                    <button type="button" aria-label={`${expandedCreatorId === entry.creatorId ? "Hide" : "Show"} details for ${entry.creator?.name ?? "creator"}`} aria-expanded={expandedCreatorId === entry.creatorId} className="mr-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-slate-500 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-600">
                       {expandedCreatorId === entry.creatorId ? <ChevronDown className="h-4 w-4" strokeWidth={2} aria-hidden="true" /> : <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />}
                     </button>
                     {entry.creator?.name ?? "—"}
@@ -243,7 +294,7 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                       </span>
                     ) : <span className="text-[#53668e]">No deal yet</span>}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-4">
+                  <td className="whitespace-nowrap px-3 py-4" onClick={(event) => event.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       <button type="button" onClick={() => editingDealFor === entry.creatorId ? setEditingDealFor(null) : startEditDeal(entry)} aria-label={`${entry.deal ? "Edit" : "Assign"} deal for ${entry.creator?.name ?? "creator"}`} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-[#405579] hover:bg-brand-50 hover:text-brand-600">
                         <Pencil className="h-4 w-4" strokeWidth={2} />
@@ -290,6 +341,27 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                         )}
                       </div>
                       <div className="mt-4 border-t border-[#e5ebf5] pt-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#405579]">Deliverables</p>
+                          {dealDeliverables.length > 0 && (
+                            <ul className="mb-2 space-y-1">
+                              {dealDeliverables.map((item, index) => (
+                                <li key={index} className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                                  <span>{deliverableLabels[item.type]}</span>
+                                  <span className="font-semibold">{item.type === "Ad Rights" ? `${item.quantity} month${item.quantity === 1 ? "" : "s"}` : `${item.quantity} ×`}</span>
+                                  <button type="button" aria-label={`Remove ${deliverableLabels[item.type]}`} onClick={() => setDealDeliverables(current => current.filter((_, i) => i !== index))} className="ml-auto cursor-pointer rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50">Remove</button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          <div className="flex flex-wrap items-end gap-2">
+                            <select aria-label="New deliverable type" value={newDeliverableType} onChange={(event) => setNewDeliverableType(event.target.value as Deliverable["type"])} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                              {(Object.keys(deliverableLabels) as Deliverable["type"][]).map(type => <option key={type} value={type}>{deliverableLabels[type]}</option>)}
+                            </select>
+                            <input aria-label="New deliverable quantity" type="number" min="1" max="999" step="1" value={Number.isNaN(newDeliverableQuantity) ? "" : newDeliverableQuantity} onChange={(event) => setNewDeliverableQuantity(event.target.valueAsNumber)} className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                            <button type="button" disabled={dealDeliverables.length >= 50 || !Number.isInteger(newDeliverableQuantity) || newDeliverableQuantity < 1 || newDeliverableQuantity > 999} onClick={() => { setDealDeliverables(current => [...current, { type: newDeliverableType, quantity: newDeliverableQuantity }]); setNewDeliverableQuantity(1); }} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-2 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">+ Add deliverable</button>
+                          </div>
+                      </div>
+                      <div className="mt-4 border-t border-[#e5ebf5] pt-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-[#405579]">Offer history</p>
                         {!entry.deal ? (
                           <p className="mt-2 text-sm text-[#53668e]">Save a deal to start the negotiation.</p>
@@ -316,12 +388,92 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                   <tr className="border-t border-[#edf1f8] bg-[#f8faff]">
                     <td colSpan={6} className="px-5 py-5">
                       <div className="mb-4 flex items-center justify-between gap-4">
-                        <p className="text-sm font-semibold text-[#101c40]">{entry.creator?.name ?? "Creator"}&rsquo;s deals</p>
+                        <p className="text-sm font-semibold text-[#101c40]">{entry.creator?.name ?? "Creator"}&rsquo;s details</p>
                         <Link href={`/manager/creators/${entry.creatorId}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700">
                           Open full page <ArrowUpRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
                         </Link>
                       </div>
-                      <CreatorDealDashboard creatorId={entry.creatorId} />
+                      <dl className="mb-6 grid gap-4 rounded-xl border border-[#e5ebf5] bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
+                        <div><dt className="text-xs text-[#53668e]">Category</dt><dd className="mt-1 text-sm font-medium">{entry.creator?.category || "—"}</dd></div>
+                        <div><dt className="text-xs text-[#53668e]">Email</dt><dd className="mt-1 text-sm font-medium">{entry.creator?.email || "—"}</dd></div>
+                        <div><dt className="text-xs text-[#53668e]">Phone</dt><dd className="mt-1 text-sm font-medium">{entry.creator?.phone || "—"}</dd></div>
+                        <div><dt className="text-xs text-[#53668e]">Instagram</dt><dd className="mt-1 text-sm font-medium">{entry.creator?.instagramHandle || "—"}</dd></div>
+                        {entry.creator?.notes && (
+                          <div className="sm:col-span-2 lg:col-span-4"><dt className="text-xs text-[#53668e]">Notes</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{entry.creator.notes}</dd></div>
+                        )}
+                      </dl>
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#405579]">Deal for this campaign</p>
+                      {entry.deal ? (
+                        <>
+                        <dl className="grid gap-4 rounded-xl border border-[#e5ebf5] bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
+                          <div><dt className="text-xs text-[#53668e]">Amount</dt><dd className="mt-1 text-sm font-medium">{symbol}{entry.deal.amount.toLocaleString()}</dd></div>
+                          <div><dt className="text-xs text-[#53668e]">Due date</dt><dd className="mt-1 text-sm font-medium">{new Date(`${entry.deal.dueDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</dd></div>
+                          <div><dt className="text-xs text-[#53668e]">Status</dt><dd className="mt-1 text-sm font-medium">{entry.deal.acceptanceStatus ? acceptanceLabels[entry.deal.acceptanceStatus] : "—"}</dd></div>
+                          {entry.deal.notes && (
+                            <div className="sm:col-span-2 lg:col-span-4"><dt className="text-xs text-[#53668e]">Notes</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{entry.deal.notes}</dd></div>
+                          )}
+                        </dl>
+                        {editingDealFor !== entry.creatorId && (
+                        <div className="mt-4 rounded-xl border border-[#e5ebf5] bg-white p-5">
+                          <div className="mb-3 flex items-center justify-between">
+                            <button type="button" aria-expanded={!collapsedDeliverables.has(entry.creatorId)} onClick={() => setCollapsedDeliverables(current => { const next = new Set(current); if (next.has(entry.creatorId)) next.delete(entry.creatorId); else next.add(entry.creatorId); return next; })} className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#101c40]">
+                              <span className={`inline-block transition-transform ${collapsedDeliverables.has(entry.creatorId) ? "-rotate-90" : ""}`}>▾</span>
+                              Deliverables
+                              <span className="text-xs font-normal text-[#53668e]">{entry.deal.deliverables?.length ?? 0} item{(entry.deal.deliverables?.length ?? 0) === 1 ? "" : "s"}</span>
+                            </button>
+                          </div>
+                          <div className="mb-4 flex justify-end">
+                            <button type="button" disabled={savingDeliverables || draftDeliverableFor === entry.creatorId || (entry.deal.deliverables?.length ?? 0) >= 50} onClick={() => { setDraftDeliverableFor(entry.creatorId); setPanelDeliverableQuantity(1); setCollapsedDeliverables(current => { const next = new Set(current); next.delete(entry.creatorId); return next; }); }} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-2 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">+ Add deliverable</button>
+                          </div>
+                          {deliverableError && <p role="alert" className="mb-3 text-sm text-red-700">{deliverableError}</p>}
+                          {!collapsedDeliverables.has(entry.creatorId) && (entry.deal.deliverables?.length || draftDeliverableFor === entry.creatorId ? (
+                            <ul className="space-y-2">
+                              {(entry.deal.deliverables ?? []).map((item, index) => {
+                                const menuKey = `${entry.creatorId}:${index}`;
+                                const itemName = deliverableLabels[item.type];
+                                return (
+                                  <li key={index} className={`flex items-center gap-3 rounded-lg px-3 py-3 ${index % 2 ? "bg-[#f0f5ff]" : "bg-[#fcf0fa]"}`}>
+                                    <input
+                                      type="checkbox"
+                                      aria-label={`Mark ${itemName} for ${entry.creator?.name ?? "creator"} as done`}
+                                      checked={!!item.done}
+                                      disabled={savingDeliverables}
+                                      onChange={() => toggleDeliverable(entry, index)}
+                                      className="h-4 w-4 shrink-0 cursor-pointer accent-emerald-600"
+                                    />
+                                    <span className={`text-sm ${item.done ? "text-[#53668e] line-through" : ""}`}>{itemName}</span>
+                                    <span className="ml-auto whitespace-nowrap text-sm font-semibold">{item.type === "Ad Rights" ? `${item.quantity} month${item.quantity === 1 ? "" : "s"}` : `${item.quantity} ×`}</span>
+                                    <div className="relative">
+                                      <button type="button" aria-label={`More options for ${itemName}`} aria-haspopup="menu" aria-expanded={deliverableMenuKey === menuKey} onClick={() => setDeliverableMenuKey(current => current === menuKey ? null : menuKey)} className="cursor-pointer rounded px-2 py-1 text-base leading-none text-[#53668e] hover:bg-white">⋮</button>
+                                      {deliverableMenuKey === menuKey && (
+                                        <div role="menu" className="absolute right-0 z-10 mt-1 w-28 rounded-lg border border-slate-200 bg-white py-1 shadow-md">
+                                          <button type="button" role="menuitem" disabled={savingDeliverables} onClick={() => { setDeliverableMenuKey(null); removePanelDeliverable(entry, index); }} className="w-full cursor-pointer px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">Remove</button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                              {draftDeliverableFor === entry.creatorId && (
+                                <li className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-[#243657]/40 px-3 py-3">
+                                  <select aria-label={`New deliverable type for ${entry.creator?.name ?? "creator"}`} value={panelDeliverableType} onChange={(event) => setPanelDeliverableType(event.target.value as Deliverable["type"])} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                                    {(Object.keys(deliverableLabels) as Deliverable["type"][]).map(type => <option key={type} value={type}>{deliverableLabels[type]}</option>)}
+                                  </select>
+                                  <input aria-label={`New deliverable quantity for ${entry.creator?.name ?? "creator"}`} type="number" min="1" max="999" step="1" value={Number.isNaN(panelDeliverableQuantity) ? "" : panelDeliverableQuantity} onChange={(event) => setPanelDeliverableQuantity(event.target.valueAsNumber)} className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                                  <div className="ml-auto flex gap-2">
+                                    <button type="button" onClick={() => setDraftDeliverableFor(null)} className="cursor-pointer rounded-lg px-3 py-2 text-xs font-semibold text-[#53668e] hover:bg-slate-100">Cancel</button>
+                                    <button type="button" disabled={savingDeliverables || !Number.isInteger(panelDeliverableQuantity) || panelDeliverableQuantity < 1 || panelDeliverableQuantity > 999} onClick={() => { addPanelDeliverable(entry); setDraftDeliverableFor(null); }} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-2 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">{savingDeliverables ? "Saving…" : "Add"}</button>
+                                  </div>
+                                </li>
+                              )}
+                            </ul>
+                          ) : <p className="text-sm text-[#53668e]">No deliverables assigned yet.</p>)}
+                        </div>
+                        )}
+                        </>
+                      ) : (
+                        <p className="rounded-xl border border-dashed border-[#c9d4e8] bg-white p-5 text-sm text-[#53668e]">No deal assigned yet. Use the pencil icon on the row to assign one.</p>
+                      )}
                     </td>
                   </tr>
                 )}

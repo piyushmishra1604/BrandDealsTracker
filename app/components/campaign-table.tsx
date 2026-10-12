@@ -31,10 +31,10 @@ function CampaignThumbnail({ imageUrl }: { imageUrl?: string | null }) {
 // read the same way at a glance.
 const cornerColors: Record<CampaignStatus, string> = {
   draft: "#eab308",
+  created: "#0ea5e9",
   active: "#22c55e",
-  paused: "#f97316",
+  pending: "#f97316",
   completed: "#4f46e5",
-  archived: "#94a3b8",
 };
 
 function StatusCorner({ status }: { status: CampaignStatus }) {
@@ -77,7 +77,7 @@ function CampaignActions({ campaign, onArchive }: { campaign: Campaign; onArchiv
           <button type="button" onClick={() => { setOpen(false); router.push(`/manager/campaigns/${campaign.id}`); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-[#101c40] hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-600">
             View
           </button>
-          {onArchive && campaign.status !== "archived" && (
+          {onArchive && !campaign.archived && (
             <button type="button" onClick={() => { setOpen(false); onArchive(campaign); }} className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600">
               Archive
             </button>

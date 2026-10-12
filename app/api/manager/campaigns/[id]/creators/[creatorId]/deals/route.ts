@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAssignedDealInput, assignedDealDateError, todayDate, type Deal } from "@/lib/deals";
+import { isAssignedDealInput, isDeliverables, assignedDealDateError, todayDate, type Deal } from "@/lib/deals";
 import { managerAssignedFields, managerOfferTransition, isNegotiationNote, type ManagerAssignmentInput } from "@/lib/assigned-deals";
 import {
   getAuthorizedAssignment, findCampaignCreatorDeal, applyDealChange, type Supabase,
@@ -96,6 +96,35 @@ async function createAssignedDeal(input: {
   }
   await notifyDealAssigned(supabase, { userId: linkedUserId, workspaceId: campaign.workspaceId, dealId: deal.id });
   return NextResponse.json({ deal });
+}
+
+// Manager edits the deliverable list (add, remove, or tick done). The offer status and amount are unchanged.
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {
+  const { id, creatorId } = await params;
+  const authorized = await getAuthorizedAssignment(id, creatorId);
+  if (!authorized) return NextResponse.json(NOT_FOUND, { status: 404 });
+  const { supabase, creator } = authorized;
+
+  let body: unknown;
+  try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
+  const deliverables = (body as { deliverables?: unknown } | null)?.deliverables;
+  if (!isDeliverables(deliverables)) return NextResponse.json({ error: "Invalid deliverables." }, { status: 400 });
+
+  const existingResult = await findCampaignCreatorDeal(supabase, id, creator.id);
+  if (!existingResult.ok) return NextResponse.json({ error: existingResult.error }, { status: existingResult.status });
+  const existing = existingResult.value;
+  if (!existing) return NextResponse.json({ error: "No deal found for this creator on this campaign." }, { status: 404 });
+
+  const currentStatus = existing.acceptanceStatus ?? "pending";
+  const result = await applyDealChange(supabase, {
+    dealId: existing.id,
+    expectedStatus: currentStatus,
+    patch: { deliverables },
+    actor: null,
+    event: null,
+  });
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json({ deal: result.value });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {

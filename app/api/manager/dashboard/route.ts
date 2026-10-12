@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
   const supabase = getSupabaseAdmin();
   const [{ count: totalCampaigns, error: totalError }, { count: activeCampaigns, error: activeError }, { count: totalCreators, error: creatorsError }] = await Promise.all([
-    supabase.from("campaigns").select("id", { count: "exact", head: true }).eq("workspaceId", workspaceId).neq("status", "archived"),
+    supabase.from("campaigns").select("id", { count: "exact", head: true }).eq("workspaceId", workspaceId).eq("archived", false),
     supabase.from("campaigns").select("id", { count: "exact", head: true }).eq("workspaceId", workspaceId).eq("status", "active"),
     supabase.from("creators").select("id", { count: "exact", head: true }).eq("workspaceId", workspaceId),
   ]);

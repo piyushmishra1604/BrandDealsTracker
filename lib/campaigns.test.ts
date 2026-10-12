@@ -61,7 +61,7 @@ describe("campaignDateError", () => {
 
 describe("isCampaignStatus", () => {
   it("accepts every defined status", () => {
-    for (const status of ["draft", "active", "paused", "completed", "archived"]) {
+    for (const status of ["draft", "created", "active", "pending", "completed"]) {
       expect(isCampaignStatus(status)).toBe(true);
     }
   });
