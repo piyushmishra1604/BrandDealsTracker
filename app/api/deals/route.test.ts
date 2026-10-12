@@ -5,7 +5,7 @@ const state = vi.hoisted(() => ({ fake: null as unknown, user: null as unknown }
 vi.mock("@/lib/auth/account", () => ({ requireCreator: async () => state.user }));
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => state.fake }));
 
-const { POST } = await import("./route");
+const { POST, GET } = await import("./route");
 
 const baseDeal = {
   id: "deal-1", brand: "Nike", amount: 15000, dealDate: "2026-10-01", dueDate: "2999-01-01",
@@ -37,6 +37,35 @@ function post(body: unknown) {
 
 beforeEach(() => {
   state.user = { sub: "creator-1", email: "c@example.com" };
+});
+
+describe("GET /api/deals for a creator", () => {
+  it("requires a signed-in creator", async () => {
+    state.user = null;
+    state.fake = createFakeSupabase(() => ({ data: [] }));
+    const response = await GET();
+    expect(response.status).toBe(401);
+  });
+
+  it("reads only the signed-in creator's own deals, scoped by user_id", async () => {
+    const fake = createFakeSupabase(() => ({ data: [], error: null }));
+    state.fake = fake;
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const dealQuery = fake.queries.find((q) => q.table === "deals" && q.op === "select");
+    expect(dealQuery?.filters).toEqual({ user_id: "creator-1" });
+  });
+
+  it("returns the rows the query yields, without other creators' deals", async () => {
+    const mine = { ...baseDeal, user_id: "creator-1" };
+    state.fake = createFakeSupabase((q: FakeQuery): FakeResult => {
+      if (q.table !== "deals" || q.op !== "select") return { data: null };
+      const rows = [mine, { ...baseDeal, id: "deal-2", user_id: "someone-else" }];
+      return { data: rows.filter((row) => row.user_id === q.filters.user_id), error: null };
+    });
+    const body = await (await GET()).json();
+    expect(body.deals).toEqual([mine]);
+  });
 });
 
 describe("POST /api/deals for a creator", () => {

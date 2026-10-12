@@ -5,12 +5,13 @@ vi.mock("@/lib/auth/workspace", () => ({ requireWorkspaceAccess: (...args: unkno
 
 const mockCreatorMaybeSingle = vi.fn();
 const mockDealsOrder = vi.fn();
+const mockDealsEq = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => ({
     from: (table: string) => {
       if (table === "creators") return { select: () => ({ eq: () => ({ maybeSingle: () => mockCreatorMaybeSingle() }) }) };
-      return { select: () => ({ eq: () => ({ order: () => mockDealsOrder() }) }) };
+      return { select: () => ({ eq: (...args: unknown[]) => { mockDealsEq(...args); return { order: () => mockDealsOrder() }; } }) };
     },
   }),
 }));
@@ -23,7 +24,7 @@ const existingCreator = { id: "c1", workspaceId: "workspace-a" };
 const owner = { sub: "user-1", email: "a@example.com", role: "owner" };
 
 describe("GET /api/manager/creators/[id]/deals", () => {
-  beforeEach(() => { mockCreatorMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); mockDealsOrder.mockReset(); });
+  beforeEach(() => { mockCreatorMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); mockDealsOrder.mockReset(); mockDealsEq.mockClear(); });
 
   it("returns 404 for a creator that doesn't exist", async () => {
     mockCreatorMaybeSingle.mockResolvedValue({ data: null });
@@ -56,6 +57,14 @@ describe("GET /api/manager/creators/[id]/deals", () => {
     expect(body.deals).toHaveLength(3);
     expect(body.deals[0].campaign.title).toBe("Spring Drop");
     expect(body.summary).toEqual({ activeCount: 2, activeValue: 27000, completedCount: 1, completedValue: 4000 });
+  });
+
+  it("lists only deals attached to this creator, never a creator's personal deals", async () => {
+    mockCreatorMaybeSingle.mockResolvedValue({ data: existingCreator });
+    mockRequireWorkspaceAccess.mockResolvedValue(owner);
+    mockDealsOrder.mockResolvedValue({ data: [], error: null });
+    await GET(makeRequest(), { params });
+    expect(mockDealsEq).toHaveBeenCalledWith("creatorId", "c1");
   });
 
   it("returns an empty summary when the creator has no deals", async () => {

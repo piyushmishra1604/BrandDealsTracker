@@ -5,13 +5,16 @@ vi.mock("@/lib/auth/workspace", () => ({ requireWorkspaceAccess: (...args: unkno
 
 const mockMaybeSingle = vi.fn();
 const mockUpdate = vi.fn();
+const mockFrom = vi.fn();
 const supabaseChain = {
   select: () => supabaseChain,
   eq: () => supabaseChain,
   maybeSingle: () => mockMaybeSingle(),
   update: (...args: unknown[]) => mockUpdate(...args),
 };
-vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({ from: () => supabaseChain }) }));
+vi.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: () => ({ from: (table: string) => { mockFrom(table); return supabaseChain; } }),
+}));
 
 const { POST } = await import("./route");
 
@@ -23,7 +26,18 @@ const existingCreator = { id: "c1", workspaceId: "workspace-a", name: "Ankita Ra
 const manager = { sub: "user-1", email: "a@example.com", role: "owner" };
 
 describe("POST /api/manager/creators/[id]/archive", () => {
-  beforeEach(() => { mockMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); mockUpdate.mockReset(); });
+  beforeEach(() => { mockMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); mockUpdate.mockReset(); mockFrom.mockClear(); });
+
+  it("only touches the creators table, so deal history is left intact", async () => {
+    mockMaybeSingle.mockResolvedValue({ data: existingCreator });
+    mockRequireWorkspaceAccess.mockResolvedValue(manager);
+    const chain = { eq: () => chain, select: () => chain, single: () => Promise.resolve({ data: { ...existingCreator, archivedAt: "now" }, error: null }) };
+    mockUpdate.mockReturnValue(chain);
+    await POST(makeRequest({ archived: true }), { params });
+    const tables = new Set(mockFrom.mock.calls.map(([table]) => table));
+    expect([...tables]).toEqual(["creators"]);
+    expect(mockUpdate.mock.calls.every(([payload]) => Object.keys(payload).join() === "archivedAt")).toBe(true);
+  });
 
   it("returns 404 for a creator in another agency's workspace, and changes nothing", async () => {
     mockMaybeSingle.mockResolvedValue({ data: existingCreator });
