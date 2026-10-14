@@ -54,7 +54,7 @@ export function CreatorDealDashboard({ creatorId }: { creatorId: string }) {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState("all");
   const [monthWindowStart, setMonthWindowStart] = useState(0);
   const [dateSort, setDateSort] = useState<{ column: "dealDate" | "dueDate"; direction: "ascending" | "descending" }>({ column: "dealDate", direction: "descending" });
   const [visiblePages, setVisiblePages] = useState(1);

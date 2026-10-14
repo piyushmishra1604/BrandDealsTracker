@@ -47,24 +47,29 @@ describe("GET /api/deals for a creator", () => {
     expect(response.status).toBe(401);
   });
 
-  it("reads only the signed-in creator's own deals, scoped by user_id", async () => {
-    const fake = createFakeSupabase(() => ({ data: [], error: null }));
+  it("reads the creator's own deals plus deals a manager added for a linked creator", async () => {
+    const fake = createFakeSupabase((q: FakeQuery): FakeResult => {
+      if (q.table === "creators") return { data: [{ id: "creator-record-1" }], error: null };
+      return { data: [], error: null };
+    });
     state.fake = fake;
     const response = await GET();
     expect(response.status).toBe(200);
     const dealQuery = fake.queries.find((q) => q.table === "deals" && q.op === "select");
-    expect(dealQuery?.filters).toEqual({ user_id: "creator-1" });
+    expect(dealQuery?.or).toBe("user_id.eq.creator-1,creatorId.in.(creator-record-1)");
+    expect(fake.queries.find((q) => q.table === "creators")?.filters).toEqual({ linkedUserId: "creator-1" });
   });
 
-  it("returns the rows the query yields, without other creators' deals", async () => {
-    const mine = { ...baseDeal, user_id: "creator-1" };
+  it("returns visible rows, leaving out drafts the manager has not sent", async () => {
+    const mine = { ...baseDeal, user_id: "creator-1", acceptanceStatus: null };
+    const sent = { ...baseDeal, id: "deal-3", user_id: null, creatorId: "creator-record-1", acceptanceStatus: "pending" };
+    const draft = { ...baseDeal, id: "deal-4", user_id: null, creatorId: "creator-record-1", acceptanceStatus: "draft" };
     state.fake = createFakeSupabase((q: FakeQuery): FakeResult => {
-      if (q.table !== "deals" || q.op !== "select") return { data: null };
-      const rows = [mine, { ...baseDeal, id: "deal-2", user_id: "someone-else" }];
-      return { data: rows.filter((row) => row.user_id === q.filters.user_id), error: null };
+      if (q.table === "creators") return { data: [{ id: "creator-record-1" }], error: null };
+      return { data: [mine, sent, draft], error: null };
     });
     const body = await (await GET()).json();
-    expect(body.deals).toEqual([mine]);
+    expect(body.deals.map((d: { id: string }) => d.id)).toEqual(["deal-1", "deal-3"]);
   });
 });
 

@@ -8,6 +8,7 @@ export type FakeQuery = {
   filters: Record<string, unknown>;
   notEquals: Record<string, unknown>;
   isNull: string[];
+  or?: string;
 };
 
 export type FakeResult = { data: unknown; error?: { code?: string; message: string } | null };
@@ -33,6 +34,7 @@ export function createFakeSupabase(handler: FakeHandler, rpcHandler: FakeRpcHand
         eq(column: string, value: unknown) { query.filters[column] = value; return builder; },
         neq(column: string, value: unknown) { query.notEquals[column] = value; return builder; },
         is(column: string) { query.isNull.push(column); return builder; },
+        or(filter: string) { query.or = filter; return builder; },
         insert(payload: Record<string, unknown>) { query.op = "insert"; query.payload = payload; return builder; },
         update(payload: Record<string, unknown>) { query.op = "update"; query.payload = payload; return builder; },
         upsert(payload: Record<string, unknown>) { query.op = "upsert"; query.payload = payload; return builder; },

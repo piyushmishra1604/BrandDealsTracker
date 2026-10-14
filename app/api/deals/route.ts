@@ -3,15 +3,15 @@ import { requireCreator } from "@/lib/auth/account";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isDeal, dealDateError, type Deal } from "@/lib/deals";
 import { creatorAssignedEdit, UNASSIGNED_DEAL_FIELDS } from "@/lib/assigned-deals";
+import { visibleCreatorDeals } from "@/lib/assigned-deal-store";
 
 export async function GET() {
   const user = await requireCreator();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
-  const { data, error } = await getSupabaseAdmin().from("deals").select("*").eq("user_id", user.sub).order("dealDate", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!data.every(isDeal)) return NextResponse.json({ error: "The saved deals have an unexpected format." }, { status: 500 });
-  return NextResponse.json({ deals: data });
+  const result = await visibleCreatorDeals(getSupabaseAdmin(), user.sub);
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json({ deals: result.value });
 }
 
 // Creators own their deals, but a deal a manager assigned is only partly theirs to edit.

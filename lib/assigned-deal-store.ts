@@ -44,12 +44,34 @@ export async function findCampaignCreatorDeal(supabase: Supabase, campaignId: st
   return { ok: true, value: data };
 }
 
-// A creator may only negotiate a deal they own that a manager assigned to them.
-export async function findOwnedAssignedDeal(supabase: Supabase, dealId: string, userId: string): Promise<StoreResult<Deal>> {
-  const { data, error } = await supabase.from("deals").select("*").eq("id", dealId).eq("user_id", userId).maybeSingle();
+// Creator directory ids linked to this login. A manager-added deal for one of these creators is visible to the login.
+export async function linkedCreatorIds(supabase: Supabase, userId: string): Promise<StoreResult<string[]>> {
+  const { data, error } = await supabase.from("creators").select("id").eq("linkedUserId", userId);
   if (error) return { ok: false, status: 500, error: error.message };
+  return { ok: true, value: (data ?? []).map((row) => row.id as string) };
+}
+
+// Deals a creator login can see: their own, plus any deal a manager added for a creator linked to
+// this login. Drafts stay hidden until the manager sends them.
+export async function visibleCreatorDeals(supabase: Supabase, userId: string): Promise<StoreResult<Deal[]>> {
+  const linked = await linkedCreatorIds(supabase, userId);
+  if (!linked.ok) return linked;
+  const filter = linked.value.length
+    ? `user_id.eq.${userId},creatorId.in.(${linked.value.join(",")})`
+    : `user_id.eq.${userId}`;
+  const { data, error } = await supabase.from("deals").select("*").or(filter).order("dealDate", { ascending: false });
+  if (error) return { ok: false, status: 500, error: error.message };
+  const rows = (data ?? []).filter((row) => row.acceptanceStatus !== "draft");
+  if (!rows.every(isDeal)) return { ok: false, status: 500, error: "The saved deals have an unexpected format." };
+  return { ok: true, value: rows as Deal[] };
+}
+
+// A creator may only negotiate a deal they can see that a manager assigned to them.
+export async function findOwnedAssignedDeal(supabase: Supabase, dealId: string, userId: string): Promise<StoreResult<Deal>> {
+  const visible = await visibleCreatorDeals(supabase, userId);
+  if (!visible.ok) return visible;
+  const data = visible.value.find((deal) => deal.id === dealId);
   if (!data) return { ok: false, status: 404, error: "Deal not found." };
-  if (!isDeal(data)) return { ok: false, status: 500, error: "The saved deal has an unexpected format." };
   if (!data.campaignId) return { ok: false, status: 400, error: "This deal was not assigned by a manager." };
   return { ok: true, value: data };
 }

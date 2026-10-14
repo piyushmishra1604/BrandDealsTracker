@@ -457,6 +457,11 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                         <button type="button" onClick={() => void saveDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                           {savingDeal ? "Saving…" : entry.deal?.acceptanceStatus === "countered" ? "Send counter-offer" : "Save Deal"}
                         </button>
+                        {entry.deal?.acceptanceStatus === "draft" && entry.creator?.linkedUserId && (
+                          <button type="button" onClick={() => void sendDeal(entry)} disabled={savingStatus} className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                            {savingStatus ? "Sending…" : "Send to creator"}
+                          </button>
+                        )}
                         {(entry.deal?.acceptanceStatus === "accepted" || entry.deal?.acceptanceStatus === "countered") && (
                           <button type="button" onClick={() => void confirmDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                             {entry.deal.acceptanceStatus === "countered" ? "Accept counter-offer" : "Confirm amount"}

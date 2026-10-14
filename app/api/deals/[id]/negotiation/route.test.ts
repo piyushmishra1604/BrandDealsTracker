@@ -18,7 +18,8 @@ const deal = {
 
 function useFake(current: Record<string, unknown> | null, rpc: FakeResult = { data: null, error: null }) {
   const fake = createFakeSupabase((q: FakeQuery): FakeResult => {
-    if (q.table === "deals") return { data: current };
+    if (q.table === "creators") return { data: [{ id: "creator-record-1" }] };
+    if (q.table === "deals") return { data: current ? [current] : [] };
     if (q.table === "deal_offers") return { data: [{ actor: "manager", event: "offer", amount: 15000, note: "", created_at: "2026-10-01T00:00:00Z" }] };
     return { data: null };
   }, (name) => (name === "apply_deal_change" ? { data: { ...deal, acceptanceStatus: "accepted" }, error: rpc.error ?? null } : { data: null }));

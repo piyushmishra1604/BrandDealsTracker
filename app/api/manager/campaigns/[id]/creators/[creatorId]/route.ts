@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireWorkspaceAccess } from "@/lib/auth/workspace";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { UNASSIGNED_DEAL_FIELDS } from "@/lib/assigned-deals";
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {
   const { id, creatorId } = await params;
@@ -17,9 +16,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length !== 1) return NextResponse.json({ error: "That creator isn't on this campaign." }, { status: 400 });
 
-  // Deals have no FK to campaign_creators, so removing a creator here would otherwise leave
-  // their deal pointing at a campaign they're no longer on. Unassign it instead of deleting it.
-  const { error: dealError } = await supabase.from("deals").update(UNASSIGNED_DEAL_FIELDS).eq("campaignId", id).eq("creatorId", creatorId);
+  // Deals have no FK to campaign_creators, so delete the creator's campaign deal here. Leaving it
+  // unassigned would strand it with no owner, which the deals table doesn't allow.
+  const { error: dealError } = await supabase.from("deals").delete().eq("campaignId", id).eq("creatorId", creatorId);
   if (dealError) return NextResponse.json({ error: dealError.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

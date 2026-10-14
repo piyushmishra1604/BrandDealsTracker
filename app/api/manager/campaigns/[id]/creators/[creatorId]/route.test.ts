@@ -5,14 +5,13 @@ vi.mock("@/lib/auth/workspace", () => ({ requireWorkspaceAccess: (...args: unkno
 
 const mockCampaignMaybeSingle = vi.fn();
 const mockDeleteSelect = vi.fn();
-const mockDealsUpdate = vi.fn();
-const mockDealsUpdateEq = vi.fn();
+const mockDealsDeleteEq = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => ({
     from: (table: string) => {
       if (table === "campaigns") return { select: () => ({ eq: () => ({ maybeSingle: () => mockCampaignMaybeSingle() }) }) };
-      if (table === "deals") return { update: (fields: unknown) => { mockDealsUpdate(fields); return { eq: () => ({ eq: () => mockDealsUpdateEq() }) }; } };
+      if (table === "deals") return { delete: () => ({ eq: () => ({ eq: () => mockDealsDeleteEq() }) }) };
       return { delete: () => ({ eq: () => ({ eq: () => ({ select: () => mockDeleteSelect() }) }) }) };
     },
   }),
@@ -27,7 +26,7 @@ const existingCampaign = { id: "camp-1", workspaceId: "workspace-a" };
 describe("DELETE /api/manager/campaigns/[id]/creators/[creatorId]", () => {
   beforeEach(() => {
     mockCampaignMaybeSingle.mockReset(); mockRequireWorkspaceAccess.mockReset(); mockDeleteSelect.mockReset();
-    mockDealsUpdate.mockReset(); mockDealsUpdateEq.mockReset(); mockDealsUpdateEq.mockResolvedValue({ error: null });
+    mockDealsDeleteEq.mockReset(); mockDealsDeleteEq.mockResolvedValue({ error: null });
   });
 
   it("returns 404 for a campaign that doesn't exist", async () => {
@@ -61,22 +60,20 @@ describe("DELETE /api/manager/campaigns/[id]/creators/[creatorId]", () => {
     expect(body.ok).toBe(true);
   });
 
-  it("unassigns any deal left pointing at the campaign for that creator", async () => {
+  it("deletes the creator's deal on the campaign so it disappears from the creator's dashboard", async () => {
     mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
     mockDeleteSelect.mockResolvedValue({ data: [{ id: "cc-1" }], error: null });
     const response = await DELETE(makeRequest(), { params });
     expect(response.status).toBe(200);
-    expect(mockDealsUpdate).toHaveBeenCalledWith({
-      workspaceId: null, campaignId: null, creatorId: null, assignedByUserId: null, acceptanceStatus: null,
-    });
+    expect(mockDealsDeleteEq).toHaveBeenCalledTimes(1);
   });
 
-  it("returns 500 if unassigning the orphaned deal fails", async () => {
+  it("returns 500 if deleting the creator's deal fails", async () => {
     mockCampaignMaybeSingle.mockResolvedValue({ data: existingCampaign });
     mockRequireWorkspaceAccess.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "owner" });
     mockDeleteSelect.mockResolvedValue({ data: [{ id: "cc-1" }], error: null });
-    mockDealsUpdateEq.mockResolvedValue({ error: { message: "db error" } });
+    mockDealsDeleteEq.mockResolvedValue({ error: { message: "db error" } });
     const response = await DELETE(makeRequest(), { params });
     expect(response.status).toBe(500);
   });
