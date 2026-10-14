@@ -33,16 +33,16 @@ export type CreatorDealSummary = {
   completedValue: number;
 };
 
-// Only a final amount that both sides agreed on counts toward money; pending, accepted, or countered
-// amounts are still negotiating. A manually entered deal is treated as agreed.
-function isAgreed(status: AcceptanceStatus | null): boolean {
-  return status === "confirmed" || status === "manual";
+// Drafts and declined deals carry no deal value. Every other deal counts its amount, matching what the
+// creator dashboard shows, including amounts still under negotiation.
+function countsTowardValue(status: AcceptanceStatus | null): boolean {
+  return status !== "draft" && status !== "declined";
 }
 
 export function summarizeCreatorDeals(deals: CreatorDealRecord[]): CreatorDealSummary {
   const summary: CreatorDealSummary = { activeCount: 0, activeValue: 0, completedCount: 0, completedValue: 0 };
   for (const deal of deals) {
-    const amount = isAgreed(deal.acceptanceStatus) ? Number(deal.amount) || 0 : 0;
+    const amount = countsTowardValue(deal.acceptanceStatus) ? Number(deal.amount) || 0 : 0;
     const stage = dealStage(deal);
     if (stage === "active") {
       summary.activeCount += 1;
