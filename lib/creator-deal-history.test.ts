@@ -38,8 +38,17 @@ describe("summarizeCreatorDeals", () => {
       { amount: "2500" as unknown as number, acceptanceStatus: "pending", moneyReceived: false },
       { amount: null, acceptanceStatus: "pending", moneyReceived: false },
     ]);
-    expect(summary.activeValue).toBe(2500);
+    expect(summary.activeValue).toBe(0);
     expect(summary.activeCount).toBe(2);
+  });
+
+  it("leaves countered and accepted amounts out of money totals until confirmed", () => {
+    const summary = summarizeCreatorDeals([
+      { amount: 30000, acceptanceStatus: "countered", moneyReceived: false },
+      { amount: 20000, acceptanceStatus: "accepted", moneyReceived: false },
+      { amount: 12000, acceptanceStatus: "confirmed", moneyReceived: false },
+    ]);
+    expect(summary).toEqual({ activeCount: 3, activeValue: 12000, completedCount: 0, completedValue: 0 });
   });
 });
 
