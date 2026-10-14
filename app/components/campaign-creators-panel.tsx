@@ -8,6 +8,15 @@ import { type CampaignCreatorEntry } from "@/lib/campaign-creators";
 import { type AssignedDealInput, type Deal, type Deliverable, todayDate } from "@/lib/deals";
 import { currencySymbols, type CurrencyCode } from "@/lib/invoices";
 import type { DealOffer } from "@/lib/assigned-deal-store";
+import {
+  DEAL_PROGRESS_LABELS, canSetDeliveryStage, dealProgressOf, latestCounterAmount, type DealProgress, type DeliveryStage,
+} from "@/lib/assigned-deals";
+import { StatCard } from "./stat-card";
+
+type DealProgressChoice = DealProgress;
+const STATUS_CHOICES: DealProgressChoice[] = ["draft", "pending", "declined", "accepted", "content_created", "sent_to_brand", "posted", "settled"];
+// Offer statuses are listed only when they are the current state or the next step (for example, Send to creator).
+const OFFER_CHOICES: DealProgressChoice[] = ["draft", "pending", "declined"];
 
 const offerEventLabels: Record<DealOffer["event"], string> = {
   offer: "sent an offer of",
@@ -26,14 +35,16 @@ const deliverableLabels: Record<Deliverable["type"], string> = {
 };
 
 export const acceptanceLabels: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
+  draft: "Created",
   pending: "Pending",
   countered: "Counter offer",
   accepted: "Accepted",
-  confirmed: "Confirmed",
+  confirmed: "Accepted",
   declined: "Declined",
   manual: "Manual",
 };
-const acceptanceColors: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
+export const acceptanceColors: Record<NonNullable<Deal["acceptanceStatus"]>, string> = {
+  draft: "bg-sky-50 text-sky-700",
   pending: "bg-amber-50 text-amber-700",
   countered: "bg-violet-50 text-violet-700",
   accepted: "bg-emerald-50 text-emerald-700",
@@ -50,6 +61,8 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
   const [picking, setPicking] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [adding, setAdding] = useState(false);
+  const [creatingNew, setCreatingNew] = useState(false);
+  const [newCreator, setNewCreator] = useState({ name: "", email: "", category: "" });
 
   const [editingDealFor, setEditingDealFor] = useState<string | null>(null);
   const [expandedCreatorId, setExpandedCreatorId] = useState<string | null>(null);
@@ -65,6 +78,8 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
   const [offersByCreator, setOffersByCreator] = useState<Record<string, DealOffer[]>>({});
   const [savingDeliverables, setSavingDeliverables] = useState(false);
   const [deliverableError, setDeliverableError] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const [panelDeliverableType, setPanelDeliverableType] = useState<Deliverable["type"]>("Reel");
   const [panelDeliverableQuantity, setPanelDeliverableQuantity] = useState(1);
   const [draftDeliverableFor, setDraftDeliverableFor] = useState<string | null>(null);
@@ -100,17 +115,45 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
     onDealsChange?.(dealsWithAmount.length, dealsWithAmount.reduce((sum, deal) => sum + deal.amount, 0));
   }, [entries, onDealsChange]);
 
+  async function addCreatorById(creatorId: string): Promise<boolean> {
+    const response = await fetch(`/api/manager/campaigns/${campaignId}/creators`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creatorId }) });
+    const body = await response.json();
+    if (!response.ok) { setError(body.error ?? "Could not add this creator."); return false; }
+    setEntries(current => [...current, body.entry]);
+    return true;
+  }
+
+  function closePicker() {
+    setPicking(false);
+    setCreatingNew(false);
+    setSelectedId("");
+    setNewCreator({ name: "", email: "", category: "" });
+  }
+
   async function addCreator() {
     if (!selectedId) return;
     setAdding(true);
     setError("");
     try {
-      const response = await fetch(`/api/manager/campaigns/${campaignId}/creators`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creatorId: selectedId }) });
-      const body = await response.json();
-      if (!response.ok) { setError(body.error ?? "Could not add this creator."); return; }
-      setEntries(current => [...current, body.entry]);
-      setSelectedId("");
-      setPicking(false);
+      if (await addCreatorById(selectedId)) closePicker();
+    } catch { setError("Could not reach the server. Check your connection and try again."); }
+    finally { setAdding(false); }
+  }
+
+  // Creates the creator in the directory first, then adds them to this campaign.
+  async function createAndAddCreator() {
+    if (!newCreator.name.trim()) return;
+    setAdding(true);
+    setError("");
+    try {
+      const created = await fetch("/api/manager/creators", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId, name: newCreator.name.trim(), email: newCreator.email.trim(), category: newCreator.category.trim() }),
+      });
+      const createdBody = await created.json();
+      if (!created.ok) { setError(createdBody.error ?? "Could not add the creator."); return; }
+      setAllCreators(current => [...current, createdBody.creator]);
+      if (await addCreatorById(createdBody.creator.id)) closePicker();
     } catch { setError("Could not reach the server. Check your connection and try again."); }
     finally { setAdding(false); }
   }
@@ -168,16 +211,16 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
     finally { setSavingDeal(false); }
   }
 
-  async function confirmDeal(creatorId: string) {
+  async function respondToDeal(creatorId: string, action: "confirm" | "decline") {
     setSavingDeal(true);
     setDealError("");
     try {
       const response = await fetch(`/api/manager/campaigns/${campaignId}/creators/${creatorId}/deals/negotiation`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "confirm", note: dealOfferNote.trim() || undefined }),
+        body: JSON.stringify({ action, note: dealOfferNote.trim() || undefined }),
       });
       const body = await response.json();
-      if (!response.ok) { setDealError(body.error ?? "Could not confirm this deal."); return; }
+      if (!response.ok) { setDealError(body.error ?? "Could not update this deal."); return; }
       setEntries(current => current.map(entry => entry.creatorId === creatorId ? { ...entry, deal: body.deal } : entry));
       setDealOfferNote("");
       setDealAmount(String(body.deal.amount));
@@ -185,6 +228,10 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
     } catch { setDealError("Could not reach the server. Check your connection and try again."); }
     finally { setSavingDeal(false); }
   }
+
+  function confirmDeal(creatorId: string) { return respondToDeal(creatorId, "confirm"); }
+
+  function declineDeal(creatorId: string) { return respondToDeal(creatorId, "decline"); }
 
   async function saveDeliverables(entry: CampaignCreatorEntry, deliverables: Deliverable[]) {
     setSavingDeliverables(true);
@@ -198,6 +245,62 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
       setEntries(current => current.map(item => item.creatorId === entry.creatorId ? { ...item, deal: body.deal } : item));
     } catch { setDeliverableError("Could not reach the server. Check your connection and try again."); }
     finally { setSavingDeliverables(false); }
+  }
+
+  // dealProgressOf reports a manual deal with no stage set as "accepted", which would mislabel it.
+  function isManualAtStart(deal: Deal): boolean {
+    return deal.acceptanceStatus === "manual" && dealProgressOf(deal) === "accepted";
+  }
+
+  // Created is set when the deal is made. Pending is set by sending a created deal, and Declined by the creator.
+  function statusChoiceEnabled(deal: Deal, choice: DealProgressChoice): boolean {
+    const current = dealProgressOf(deal);
+    if (choice === current) return true;
+    if (choice === "draft" || choice === "declined") return false;
+    if (choice === "pending") return deal.acceptanceStatus === "draft";
+    if (choice === "accepted") return deal.acceptanceStatus === "pending" || deal.acceptanceStatus === "countered" || (deal.acceptanceStatus === "confirmed" && current !== "accepted");
+    return canSetDeliveryStage(deal.acceptanceStatus);
+  }
+
+  function changeStatus(entry: CampaignCreatorEntry, choice: DealProgressChoice) {
+    if (!entry.deal || choice === "declined" || choice === "draft") return;
+    if (choice === "pending") return sendDeal(entry);
+    if (choice === "accepted") {
+      if (entry.deal.acceptanceStatus === "confirmed") return saveStage(entry, "not_started");
+      return confirmDeal(entry.creatorId);
+    }
+    return saveStage(entry, choice);
+  }
+
+  async function sendDeal(entry: CampaignCreatorEntry) {
+    setSavingStatus(true);
+    setStatusError("");
+    try {
+      const response = await fetch(`/api/manager/campaigns/${campaignId}/creators/${entry.creatorId}/deals`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ send: true, note: dealOfferNote.trim() || undefined }),
+      });
+      const body = await response.json();
+      if (!response.ok) { setStatusError(body.error ?? "Could not send this offer."); return; }
+      setEntries(current => current.map(item => item.creatorId === entry.creatorId ? { ...item, deal: body.deal } : item));
+      setDealOfferNote("");
+      void loadOffers(entry.creatorId);
+    } catch { setStatusError("Could not reach the server. Check your connection and try again."); }
+    finally { setSavingStatus(false); }
+  }
+
+  async function saveStage(entry: CampaignCreatorEntry, stage: DeliveryStage) {
+    setSavingStatus(true);
+    setStatusError("");
+    try {
+      const response = await fetch(`/api/manager/campaigns/${campaignId}/creators/${entry.creatorId}/deals`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stage }),
+      });
+      const body = await response.json();
+      if (!response.ok) { setStatusError(body.error ?? "Could not update the delivery stage."); return; }
+      setEntries(current => current.map(item => item.creatorId === entry.creatorId ? { ...item, deal: body.deal } : item));
+    } catch { setStatusError("Could not reach the server. Check your connection and try again."); }
+    finally { setSavingStatus(false); }
   }
 
   function toggleDeliverable(entry: CampaignCreatorEntry, index: number) {
@@ -243,18 +346,37 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
         )}
       </div>
 
-      {picking && (
+      {picking && !creatingNew && (
         <div className="flex flex-wrap items-center gap-2 border-b border-[#e5ebf5] bg-[#f7f9fd] px-5 py-4">
-          <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+          <select aria-label="Choose a creator" value={selectedId} onChange={(event) => setSelectedId(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
             <option value="">Choose a creator…</option>
             {availableCreators.map((creator) => <option key={creator.id} value={creator.id}>{creator.name}</option>)}
           </select>
           <button type="button" onClick={() => void addCreator()} disabled={!selectedId || adding} className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
             {adding ? "Adding…" : "Add"}
           </button>
-          <button type="button" onClick={() => { setPicking(false); setSelectedId(""); }} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">Cancel</button>
+          <button type="button" onClick={() => setCreatingNew(true)} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">+ New creator</button>
+          <button type="button" onClick={closePicker} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">Cancel</button>
           {availableCreators.length === 0 && <p className="text-sm text-[#53668e]">Every creator in your directory is already on this campaign.</p>}
         </div>
+      )}
+
+      {picking && creatingNew && (
+        <form onSubmit={(event) => { event.preventDefault(); void createAndAddCreator(); }} className="flex flex-wrap items-end gap-2 border-b border-[#e5ebf5] bg-[#f7f9fd] px-5 py-4">
+          <label className="text-xs text-[#405579]">Name
+            <input type="text" required maxLength={120} value={newCreator.name} onChange={(event) => setNewCreator(current => ({ ...current, name: event.target.value }))} placeholder="Ankita Rath" className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+          </label>
+          <label className="text-xs text-[#405579]">Email
+            <input type="email" maxLength={254} value={newCreator.email} onChange={(event) => setNewCreator(current => ({ ...current, email: event.target.value }))} placeholder="Optional" className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+          </label>
+          <label className="text-xs text-[#405579]">Category
+            <input type="text" maxLength={120} value={newCreator.category} onChange={(event) => setNewCreator(current => ({ ...current, category: event.target.value }))} placeholder="Optional" className="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+          </label>
+          <button type="submit" disabled={adding || !newCreator.name.trim()} className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {adding ? "Adding…" : "Create and add"}
+          </button>
+          <button type="button" onClick={() => setCreatingNew(false)} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">Back to list</button>
+        </form>
       )}
 
       {error && <p role="alert" className="px-5 py-3 text-sm text-red-700">{error}</p>}
@@ -273,9 +395,14 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
             {loaded && entries.length === 0 && (
               <tr><td colSpan={6} className="px-6 py-12 text-center text-[#53668e]">No creators on this campaign yet. Add one to get started.</td></tr>
             )}
-            {entries.map((entry) => (
+            {entries.map((entry) => {
+              return (
               <Fragment key={entry.id}>
-                <tr onClick={() => setExpandedCreatorId(expandedCreatorId === entry.creatorId ? null : entry.creatorId)} className="cursor-pointer border-t border-[#edf1f8] hover:bg-[#f8faff]">
+                <tr onClick={() => {
+                  const opening = expandedCreatorId !== entry.creatorId;
+                  setExpandedCreatorId(opening ? entry.creatorId : null);
+                  if (opening && entry.deal) void loadOffers(entry.creatorId);
+                }} className="cursor-pointer border-t border-[#edf1f8] hover:bg-[#f8faff]">
                   <td className="whitespace-nowrap px-5 py-4 font-medium">
                     <button type="button" aria-label={`${expandedCreatorId === entry.creatorId ? "Hide" : "Show"} details for ${entry.creator?.name ?? "creator"}`} aria-expanded={expandedCreatorId === entry.creatorId} className="mr-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-slate-500 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-600">
                       {expandedCreatorId === entry.creatorId ? <ChevronDown className="h-4 w-4" strokeWidth={2} aria-hidden="true" /> : <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />}
@@ -328,11 +455,16 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                           </label>
                         )}
                         <button type="button" onClick={() => void saveDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                          {savingDeal ? "Saving…" : "Save Deal"}
+                          {savingDeal ? "Saving…" : entry.deal?.acceptanceStatus === "countered" ? "Send counter-offer" : "Save Deal"}
                         </button>
                         {(entry.deal?.acceptanceStatus === "accepted" || entry.deal?.acceptanceStatus === "countered") && (
                           <button type="button" onClick={() => void confirmDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                             {entry.deal.acceptanceStatus === "countered" ? "Accept counter-offer" : "Confirm amount"}
+                          </button>
+                        )}
+                        {(entry.deal?.acceptanceStatus === "pending" || entry.deal?.acceptanceStatus === "countered") && (
+                          <button type="button" onClick={() => void declineDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
+                            Decline {entry.deal.acceptanceStatus === "countered" ? "counter-offer" : "offer"}
                           </button>
                         )}
                         <button type="button" onClick={() => setEditingDealFor(null)} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">Cancel</button>
@@ -384,15 +516,72 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                     </td>
                   </tr>
                 )}
-                {expandedCreatorId === entry.creatorId && (
+                {expandedCreatorId === entry.creatorId && editingDealFor !== entry.creatorId && (
                   <tr className="border-t border-[#edf1f8] bg-[#f8faff]">
                     <td colSpan={6} className="px-5 py-5">
+                        {entry.deal && (entry.deal.acceptanceStatus === "countered" || entry.deal.acceptanceStatus === "pending" || entry.deal.acceptanceStatus === "accepted") && (
+                          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e5ebf5] bg-white p-5">
+                            <p className="text-sm text-[#405579]">
+                              {entry.deal.acceptanceStatus === "countered" ? `${entry.creator?.name ?? "Creator"} countered at ${symbol}${(latestCounterAmount(offersByCreator[entry.creatorId] ?? []) ?? entry.deal.amount).toLocaleString()}. Accept it, decline, or send a different counter-offer.`
+                                : entry.deal.acceptanceStatus === "accepted" ? `${entry.creator?.name ?? "Creator"} accepted ${symbol}${entry.deal.amount.toLocaleString()}. Confirm to lock it in.`
+                                : `Waiting for ${entry.creator?.name ?? "the creator"} to respond to ${symbol}${entry.deal.amount.toLocaleString()}.`}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {(entry.deal.acceptanceStatus === "countered" || entry.deal.acceptanceStatus === "accepted") && (
+                                <button type="button" onClick={() => void confirmDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                                  {entry.deal.acceptanceStatus === "countered" ? "Accept counter-offer" : "Confirm amount"}
+                                </button>
+                              )}
+                              {(entry.deal.acceptanceStatus === "countered" || entry.deal.acceptanceStatus === "pending") && (
+                                <button type="button" onClick={() => void declineDeal(entry.creatorId)} disabled={savingDeal} className="cursor-pointer rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
+                                  Decline {entry.deal.acceptanceStatus === "countered" ? "counter-offer" : "offer"}
+                                </button>
+                              )}
+                              {entry.deal.acceptanceStatus === "countered" && (
+                                <button type="button" onClick={() => startEditDeal(entry)} disabled={savingDeal} className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+                                  Send counter-offer
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       <div className="mb-4 flex items-center justify-between gap-4">
                         <p className="text-sm font-semibold text-[#101c40]">{entry.creator?.name ?? "Creator"}&rsquo;s details</p>
                         <Link href={`/manager/creators/${entry.creatorId}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700">
                           Open full page <ArrowUpRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
                         </Link>
                       </div>
+                      {entry.deal && (
+                        <section aria-label={`Deal for ${entry.creator?.name ?? "creator"} on this campaign`} className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                          <StatCard title="Amount" value={`${symbol}${entry.deal.amount.toLocaleString()}`} />
+                          <StatCard title="Due date" value={new Date(`${entry.deal.dueDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })} />
+                          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04)]">
+                            <label htmlFor={`status-${entry.creatorId}`} className="text-xs font-medium uppercase tracking-wide text-[#53668e]">Status</label>
+                            <select
+                              id={`status-${entry.creatorId}`}
+                              value={isManualAtStart(entry.deal) ? "manual" : dealProgressOf(entry.deal)}
+                              disabled={savingStatus || savingDeal}
+                              onChange={event => void changeStatus(entry, event.target.value as DealProgressChoice)}
+                              className="mt-2 w-full cursor-pointer rounded-lg border border-[#d4ddec] bg-white px-2 py-1.5 text-lg font-bold text-[#101c40] disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {/* Manual deals were agreed off-platform, so no offer status applies until a stage is set. */}
+                              {isManualAtStart(entry.deal) && <option value="manual" disabled>Manual</option>}
+                              {STATUS_CHOICES.filter(choice => !OFFER_CHOICES.includes(choice) || statusChoiceEnabled(entry.deal!, choice)).map(choice => {
+                                const enabled = statusChoiceEnabled(entry.deal!, choice);
+                                return (
+                                  <option key={choice} value={choice} disabled={!enabled}>
+                                    {choice === "pending" && entry.deal!.acceptanceStatus === "draft" ? "Send to creator" : DEAL_PROGRESS_LABELS[choice]}{!enabled && choice !== dealProgressOf(entry.deal!) ? " (not available)" : ""}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        </section>
+                      )}
+                      {statusError && <p role="alert" className="mb-4 text-sm text-red-600">{statusError}</p>}
+                      {entry.deal?.notes && (
+                        <div className="mb-6 rounded-xl border border-[#e5ebf5] bg-white p-5"><p className="text-xs text-[#53668e]">Deal notes</p><p className="mt-1 whitespace-pre-wrap text-sm">{entry.deal.notes}</p></div>
+                      )}
                       <dl className="mb-6 grid gap-4 rounded-xl border border-[#e5ebf5] bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
                         <div><dt className="text-xs text-[#53668e]">Category</dt><dd className="mt-1 text-sm font-medium">{entry.creator?.category || "—"}</dd></div>
                         <div><dt className="text-xs text-[#53668e]">Email</dt><dd className="mt-1 text-sm font-medium">{entry.creator?.email || "—"}</dd></div>
@@ -402,27 +591,15 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                           <div className="sm:col-span-2 lg:col-span-4"><dt className="text-xs text-[#53668e]">Notes</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{entry.creator.notes}</dd></div>
                         )}
                       </dl>
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#405579]">Deal for this campaign</p>
                       {entry.deal ? (
                         <>
-                        <dl className="grid gap-4 rounded-xl border border-[#e5ebf5] bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
-                          <div><dt className="text-xs text-[#53668e]">Amount</dt><dd className="mt-1 text-sm font-medium">{symbol}{entry.deal.amount.toLocaleString()}</dd></div>
-                          <div><dt className="text-xs text-[#53668e]">Due date</dt><dd className="mt-1 text-sm font-medium">{new Date(`${entry.deal.dueDate}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</dd></div>
-                          <div><dt className="text-xs text-[#53668e]">Status</dt><dd className="mt-1 text-sm font-medium">{entry.deal.acceptanceStatus ? acceptanceLabels[entry.deal.acceptanceStatus] : "—"}</dd></div>
-                          {entry.deal.notes && (
-                            <div className="sm:col-span-2 lg:col-span-4"><dt className="text-xs text-[#53668e]">Notes</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{entry.deal.notes}</dd></div>
-                          )}
-                        </dl>
-                        {editingDealFor !== entry.creatorId && (
                         <div className="mt-4 rounded-xl border border-[#e5ebf5] bg-white p-5">
-                          <div className="mb-3 flex items-center justify-between">
+                          <div className="mb-4 flex items-center justify-between gap-3">
                             <button type="button" aria-expanded={!collapsedDeliverables.has(entry.creatorId)} onClick={() => setCollapsedDeliverables(current => { const next = new Set(current); if (next.has(entry.creatorId)) next.delete(entry.creatorId); else next.add(entry.creatorId); return next; })} className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#101c40]">
                               <span className={`inline-block transition-transform ${collapsedDeliverables.has(entry.creatorId) ? "-rotate-90" : ""}`}>▾</span>
                               Deliverables
                               <span className="text-xs font-normal text-[#53668e]">{entry.deal.deliverables?.length ?? 0} item{(entry.deal.deliverables?.length ?? 0) === 1 ? "" : "s"}</span>
                             </button>
-                          </div>
-                          <div className="mb-4 flex justify-end">
                             <button type="button" disabled={savingDeliverables || draftDeliverableFor === entry.creatorId || (entry.deal.deliverables?.length ?? 0) >= 50} onClick={() => { setDraftDeliverableFor(entry.creatorId); setPanelDeliverableQuantity(1); setCollapsedDeliverables(current => { const next = new Set(current); next.delete(entry.creatorId); return next; }); }} className="cursor-pointer rounded-lg bg-[#243657] px-3 py-2 text-xs font-semibold text-white hover:bg-[#172846] disabled:opacity-50">+ Add deliverable</button>
                           </div>
                           {deliverableError && <p role="alert" className="mb-3 text-sm text-red-700">{deliverableError}</p>}
@@ -469,7 +646,6 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                             </ul>
                           ) : <p className="text-sm text-[#53668e]">No deliverables assigned yet.</p>)}
                         </div>
-                        )}
                         </>
                       ) : (
                         <p className="rounded-xl border border-dashed border-[#c9d4e8] bg-white p-5 text-sm text-[#53668e]">No deal assigned yet. Use the pencil icon on the row to assign one.</p>
@@ -478,7 +654,8 @@ export function CampaignCreatorsPanel({ campaignId, workspaceId, currency, onCou
                   </tr>
                 )}
               </Fragment>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

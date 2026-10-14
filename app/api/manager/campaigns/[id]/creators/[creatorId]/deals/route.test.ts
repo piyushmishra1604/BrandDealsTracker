@@ -5,7 +5,7 @@ const state = vi.hoisted(() => ({ fake: null as unknown, access: null as unknown
 vi.mock("@/lib/auth/workspace", () => ({ requireWorkspaceAccess: async () => state.access }));
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => state.fake }));
 
-const { POST, DELETE } = await import("./route");
+const { POST, PATCH, DELETE } = await import("./route");
 
 const campaign = { id: "camp-1", workspaceId: "workspace-a", brand: "Nike" };
 const linkedCreator = { id: "c1", linkedUserId: "user-9" };
@@ -66,12 +66,14 @@ describe("POST manager assigned deal", () => {
     expect(fake.queries.some(q => q.table === "notifications")).toBe(false);
   });
 
-  it("notifies the linked creator when a deal is first assigned", async () => {
+  it("creates a linked creator's deal as a created draft, with no offer, no notification, and no creator access yet", async () => {
     const fake = useFake({ deal: null });
-    const response = await POST(makeRequest({ amount: 500, dueDate: "2999-01-01" }), { params });
+    const response = await POST(makeRequest({ amount: 500, dueDate: "2999-01-01", note: "Please review" }), { params });
     expect(response.status).toBe(200);
-    const notification = fake.queries.find(q => q.table === "notifications" && q.op === "insert");
-    expect(notification?.payload).toMatchObject({ userId: "user-9", dealId: "deal-new", kind: "deal_assigned", workspaceId: "workspace-a" });
+    const insert = fake.queries.find(q => q.table === "deals" && q.op === "insert");
+    expect(insert?.payload).toMatchObject({ acceptanceStatus: "draft", user_id: null, creatorId: "c1", campaignId: "camp-1" });
+    expect(fake.queries.some(q => q.table === "deal_offers")).toBe(false);
+    expect(fake.queries.some(q => q.table === "notifications")).toBe(false);
   });
 
   it("amends a manual deal without recording an offer or a negotiation event", async () => {
@@ -83,22 +85,13 @@ describe("POST manager assigned deal", () => {
     expect(fake.queries.some(q => q.table === "deal_offers")).toBe(false);
   });
 
-  it("creates a pending deal and records the first offer", async () => {
-    const fake = useFake({ deal: null });
-    const response = await POST(makeRequest({ amount: 500, dueDate: "2999-01-01", note: "Please review" }), { params });
+  it("keeps a created draft as a draft when its details are saved", async () => {
+    const fake = useFake({ deal: { ...pendingDeal, acceptanceStatus: "draft", user_id: null } });
+    const response = await POST(makeRequest({ amount: 18000, dueDate: "2999-01-01" }), { params });
     expect(response.status).toBe(200);
-    const insert = fake.queries.find(q => q.table === "deals" && q.op === "insert");
-    expect(insert?.payload).toMatchObject({ acceptanceStatus: "pending", user_id: "user-9", creatorId: "c1", assignedByUserId: "manager-1", campaignId: "camp-1", brand: "Nike" });
-    const offer = fake.queries.find(q => q.table === "deal_offers");
-    expect(offer?.payload).toMatchObject({ dealId: "deal-new", actor: "manager", event: "offer", amount: 500, note: "Please review" });
-  });
-
-  it("removes the new deal if its first offer cannot be recorded", async () => {
-    const fake = useFake({ deal: null, offerError: { message: "boom" } });
-    const response = await POST(makeRequest({ amount: 500, dueDate: "2999-01-01" }), { params });
-    expect(response.status).toBe(500);
-    const removal = fake.queries.find(q => q.table === "deals" && q.op === "delete");
-    expect(removal?.filters).toEqual({ id: "deal-new" });
+    expect(fake.rpcCalls[0].args).toMatchObject({ p_expected_status: "draft", p_event: null });
+    expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ amount: 18000, acceptanceStatus: "draft" });
+    expect(fake.queries.some(q => q.table === "deal_offers")).toBe(false);
   });
 
   it("keeps the status and creator progress when re-saving without changing the amount", async () => {
@@ -128,11 +121,11 @@ describe("POST manager assigned deal", () => {
     expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ acceptanceStatus: "pending" });
   });
 
-  it("blocks an amount change after the creator accepted", async () => {
-    const fake = useFake({ deal: { ...pendingDeal, acceptanceStatus: "accepted" } });
+  it("sends a new offer when the amount changes after the creator accepted", async () => {
+    const fake = useFake({ deal: { ...pendingDeal, acceptanceStatus: "confirmed" } });
     const response = await POST(makeRequest({ amount: 18000, dueDate: "2999-01-01" }), { params });
-    expect(response.status).toBe(409);
-    expect(fake.rpcCalls).toHaveLength(0);
+    expect(response.status).toBe(200);
+    expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ acceptanceStatus: "pending" });
   });
 
   it("resets progress when the deliverable structure changes", async () => {
@@ -145,6 +138,44 @@ describe("POST manager assigned deal", () => {
     useFake({ rpc: { data: null, error: { message: "status_changed" } } });
     const response = await POST(makeRequest({ amount: 18000, dueDate: "2999-01-01" }), { params });
     expect(response.status).toBe(409);
+  });
+});
+
+function makeSendRequest(body: unknown) {
+  return new Request("http://localhost/api/manager/campaigns/camp-1/creators/c1/deals", { method: "PATCH", body: JSON.stringify(body) });
+}
+
+describe("PATCH send a created deal to the creator", () => {
+  const draftDeal = { ...pendingDeal, acceptanceStatus: "draft", user_id: null };
+
+  it("moves a created draft to pending, gives the linked creator access, and notifies them", async () => {
+    const fake = useFake({ deal: draftDeal, rpc: { data: { ...draftDeal, acceptanceStatus: "pending", user_id: "user-9" }, error: null } });
+    const response = await PATCH(makeSendRequest({ send: true, note: "Here is the offer" }), { params });
+    expect(response.status).toBe(200);
+    expect(fake.rpcCalls[0].args).toMatchObject({ p_expected_status: "draft", p_event: "offer", p_actor: "manager", p_note: "Here is the offer" });
+    expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ acceptanceStatus: "pending", user_id: "user-9" });
+    const notification = fake.queries.find(q => q.table === "notifications" && q.op === "insert");
+    expect(notification?.payload).toMatchObject({ userId: "user-9", dealId: "deal-1", kind: "deal_assigned", workspaceId: "workspace-a" });
+  });
+
+  it("refuses to send a deal that is no longer a created draft", async () => {
+    const fake = useFake({ deal: { ...pendingDeal, acceptanceStatus: "pending" } });
+    const response = await PATCH(makeSendRequest({ send: true }), { params });
+    expect(response.status).toBe(409);
+    expect(fake.rpcCalls).toHaveLength(0);
+  });
+
+  it("refuses to send to a creator who has not linked an account", async () => {
+    const fake = useFake({ deal: draftDeal, creator: { id: "c1", linkedUserId: null } });
+    const response = await PATCH(makeSendRequest({ send: true }), { params });
+    expect(response.status).toBe(400);
+    expect(fake.rpcCalls).toHaveLength(0);
+  });
+
+  it("rejects a send value other than true", async () => {
+    useFake({ deal: draftDeal });
+    const response = await PATCH(makeSendRequest({ send: "yes" }), { params });
+    expect(response.status).toBe(400);
   });
 });
 

@@ -56,14 +56,14 @@ describe("POST /api/deals/[id]/negotiation", () => {
     const response = await post({ action: "accept" });
     expect(response.status).toBe(200);
     expect(fake.rpcCalls[0].args).toMatchObject({ p_expected_status: "pending", p_event: "accept", p_actor: "creator" });
-    expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ acceptanceStatus: "accepted", amount: 15000 });
+    expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ acceptanceStatus: "confirmed", amount: 15000 });
   });
 
-  it("counters with a new amount and note", async () => {
+  it("counters with a new amount and note, keeping the agreed amount until the manager confirms", async () => {
     const fake = useFake(deal);
     await post({ action: "counter", counterAmount: 18000, note: "Need more for the extra reel" });
     expect(fake.rpcCalls[0].args).toMatchObject({ p_event: "counter", p_actor: "creator", p_note: "Need more for the extra reel" });
-    expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ acceptanceStatus: "countered", amount: 18000 });
+    expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ acceptanceStatus: "countered", amount: 15000 });
   });
 
   it("rejects a counter equal to the current amount", async () => {

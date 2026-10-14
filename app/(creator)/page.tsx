@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { type Deal, type Deliverable, isDeliverables, isDeal, isInstagramUrl, todayDate, dealDateError } from "@/lib/deals";
 import { type Invoice, currencySymbols, invoiceTotal, invoiceFileName } from "@/lib/invoices";
 import { CloudDashboard } from "../components/cloud-dashboard";
-import { DealNegotiation, negotiationBadge } from "../components/deal-negotiation";
+import { DealNegotiation, NegotiationHistory, negotiationBadge } from "../components/deal-negotiation";
 import { CloudInvoices } from "../components/cloud-invoices";
 import { CloudProfile } from "../components/cloud-profile";
 import { CreateInvoiceButton } from "../components/invoice-modal";
@@ -91,7 +91,7 @@ function Dashboard({ deals, persistDeal, removeDeal, replaceDeal, invoices, send
   }
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [expandedDeal, setExpandedDeal] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState("all");
   const monthLabel = selectedMonth === "all" ? "All Months" : formatMonth(selectedMonth, "long");
   const monthlyDeals = selectedMonth === "all"
     ? deals
@@ -565,6 +565,7 @@ function DealDetails({ deal, onSave, onDealUpdated, invoices }: { deal: Deal; on
             ))}
           </ul> : <p className="py-4 text-sm text-[#53668e]">No invoices created yet.</p>}
         </section>
+        {deal.assignedByUserId && <NegotiationHistory key={`${deal.id}-${deal.acceptanceStatus ?? "pending"}`} deal={deal} />}
         </div>
         <div className="space-y-4">
           <section className="rounded-xl border border-[#e5ebf5] bg-white p-4">

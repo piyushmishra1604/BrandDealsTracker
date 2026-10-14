@@ -7,6 +7,8 @@ import { AtSign, Mail, Phone, Tag } from "lucide-react";
 import { type CreatorStatus, type CreatorSummary } from "@/lib/creators";
 import { CreatorStatusBadge } from "./creator-status-badge";
 import { CreatorRelationshipBadge } from "./creator-relationship-badge";
+import { StatCard } from "./stat-card";
+import { formatMoney } from "./creator-deal-dashboard";
 
 // Same corner-flag treatment as the campaign and creator-dashboard deal rows.
 const cornerColors: Record<CreatorStatus, string> = {
@@ -65,16 +67,29 @@ function CreatorActions({ creator, onSetArchived }: { creator: CreatorSummary; o
 }
 
 function CreatorDetails({ creator }: { creator: CreatorSummary }) {
+  const totalDeals = (creator.activeDealCount ?? 0) + (creator.completedDealCount ?? 0);
+  const totalValue = (creator.activeDealValue ?? 0) + (creator.completedDealValue ?? 0);
+  const received = creator.completedDealValue ?? 0;
+  const pending = creator.activeDealValue ?? 0;
+
   return (
-    <dl className="grid gap-4 sm:grid-cols-3">
-      <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Mail className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Email</dt><dd className="mt-1 text-sm font-medium">{creator.email || "—"}</dd></div>
-      <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Phone className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Phone</dt><dd className="mt-1 text-sm font-medium">{creator.phone || "—"}</dd></div>
-      <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Tag className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Category</dt><dd className="mt-1 text-sm font-medium">{creator.category || "—"}</dd></div>
-      {creator.notes && <div className="sm:col-span-3"><dt className="text-xs text-[#53668e]">Notes</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{creator.notes}</dd></div>}
-      <div className="sm:col-span-3">
-        <Link href={`/manager/creators/${creator.id}`} className="text-sm font-semibold text-brand-600 hover:underline">Open full page</Link>
-      </div>
-    </dl>
+    <div className="space-y-5">
+      <section aria-label={`Deal totals for ${creator.name}`} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatCard title="Total Deals" value={String(totalDeals)} />
+        <StatCard title="Total Deal Value" value={formatMoney(totalValue)} />
+        <StatCard title="Money Received" value={formatMoney(received)} />
+        <StatCard title="Pending Payment" value={formatMoney(pending)} />
+      </section>
+      <dl className="grid gap-4 sm:grid-cols-3">
+        <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Mail className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Email</dt><dd className="mt-1 text-sm font-medium">{creator.email || "—"}</dd></div>
+        <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Phone className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Phone</dt><dd className="mt-1 text-sm font-medium">{creator.phone || "—"}</dd></div>
+        <div><dt className="flex items-center gap-1.5 text-xs text-[#53668e]"><Tag className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />Category</dt><dd className="mt-1 text-sm font-medium">{creator.category || "—"}</dd></div>
+        {creator.notes && <div className="sm:col-span-3"><dt className="text-xs text-[#53668e]">Notes</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{creator.notes}</dd></div>}
+        <div className="sm:col-span-3">
+          <Link href={`/manager/creators/${creator.id}`} className="text-sm font-semibold text-brand-600 hover:underline">Open full page</Link>
+        </div>
+      </dl>
+    </div>
   );
 }
 

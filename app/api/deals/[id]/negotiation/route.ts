@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const result = await applyDealChange(supabase, {
     dealId: deal.id,
     expectedStatus: currentStatus,
-    patch: { acceptanceStatus: transition.status, amount: transition.amount },
+    patch: { acceptanceStatus: transition.status, amount: transition.event === "counter" ? deal.amount : transition.amount },
     actor: transition.actor,
     event: transition.event,
     note: typeof body.note === "string" ? body.note : "",

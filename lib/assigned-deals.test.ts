@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  creatorTransition, managerOfferTransition, managerConfirmTransition, creatorAssignedEdit,
+  creatorTransition, latestCounterAmount, managerOfferTransition, managerConfirmTransition, managerDeclineTransition, managerSendTransition, creatorAssignedEdit, dealProgressOf,
   isNegotiationAmount, isNegotiationNote,
+  DELIVERY_STAGES, deliveryStageFlags, deliveryStageOf, isDeliveryStage,
 } from "./assigned-deals";
 import { type Deal } from "./deals";
 
@@ -16,7 +17,7 @@ const assigned: Deal = {
 describe("creatorTransition", () => {
   it("accepting an open offer moves it to accepted at the offered amount", () => {
     expect(creatorTransition({ status: "pending", amount: 15000, action: "accept" }))
-      .toEqual({ ok: true, status: "accepted", event: "accept", actor: "creator", amount: 15000 });
+      .toEqual({ ok: true, status: "confirmed", event: "accept", actor: "creator", amount: 15000 });
   });
 
   it("declining an open offer moves it to declined", () => {
@@ -60,22 +61,54 @@ describe("managerOfferTransition", () => {
     expect(managerOfferTransition({ status: "confirmed", amountChanged: false })).toEqual({ ok: true, status: "confirmed", event: null });
   });
 
-  it("blocks an amount change while the creator's acceptance is waiting for confirmation", () => {
-    expect(managerOfferTransition({ status: "accepted", amountChanged: true })).toMatchObject({ ok: false, httpStatus: 409 });
-    expect(managerOfferTransition({ status: "accepted", amountChanged: false })).toEqual({ ok: true, status: "accepted", event: null });
+  it("sends a new offer when the price changes after the creator accepted", () => {
+    expect(managerOfferTransition({ status: "accepted", amountChanged: true })).toEqual({ ok: true, status: "pending", event: "offer" });
+  });
+});
+
+describe("created drafts", () => {
+  it("saving a created draft keeps it a draft with no offer event", () => {
+    expect(managerOfferTransition({ status: "draft", amountChanged: true })).toMatchObject({ ok: true, status: "draft", event: null });
+  });
+
+  it("sending a created draft moves it to pending with an offer event", () => {
+    expect(managerSendTransition("draft")).toMatchObject({ ok: true, status: "pending", event: "offer" });
+  });
+
+  it("only a created draft can be sent", () => {
+    for (const status of ["pending", "declined", "accepted", "confirmed", "countered", "manual"] as const) {
+      expect(managerSendTransition(status)).toMatchObject({ ok: false, httpStatus: 409 });
+    }
+  });
+
+  it("shows a created draft as Created, and cannot confirm or stage it", () => {
+    expect(dealProgressOf({ ...assigned, acceptanceStatus: "draft" })).toBe("draft");
+    expect(managerConfirmTransition("draft", 15000)).toMatchObject({ ok: false });
+  });
+});
+
+describe("managerDeclineTransition", () => {
+  it("declines a pending or countered offer", () => {
+    expect(managerDeclineTransition("countered", 18000)).toEqual({ ok: true, status: "declined", event: "decline", actor: "manager", amount: 18000 });
+    expect(managerDeclineTransition("pending", 15000)).toMatchObject({ ok: true, status: "declined" });
+  });
+
+  it.each(["accepted", "confirmed", "declined", "draft", "manual"] as const)("refuses to decline while %s", status => {
+    expect(managerDeclineTransition(status, 15000)).toMatchObject({ ok: false, httpStatus: 409 });
   });
 });
 
 describe("managerConfirmTransition", () => {
   it("confirms an accepted amount", () => {
-    expect(managerConfirmTransition("accepted", 15000)).toEqual({ ok: true, status: "confirmed", event: "confirm", actor: "manager", amount: 15000 });
+    expect(managerConfirmTransition("accepted", 15000)).toEqual({ ok: true, status: "confirmed", event: "accept", actor: "manager", amount: 15000 });
   });
 
   it("accepts the creator's counter-offer as the final amount", () => {
-    expect(managerConfirmTransition("countered", 18000)).toEqual({ ok: true, status: "confirmed", event: "confirm", actor: "manager", amount: 18000 });
+    expect(managerConfirmTransition("countered", 18000)).toEqual({ ok: true, status: "confirmed", event: "accept", actor: "manager", amount: 18000 });
+    expect(managerConfirmTransition("pending", 15000)).toEqual({ ok: true, status: "confirmed", event: "accept", actor: "manager", amount: 15000 });
   });
 
-  it.each(["pending", "declined", "confirmed"] as const)("refuses to confirm while %s", status => {
+  it.each(["declined", "confirmed"] as const)("refuses to confirm while %s", status => {
     expect(managerConfirmTransition(status, 15000)).toMatchObject({ ok: false, httpStatus: 409 });
   });
 });
@@ -124,5 +157,46 @@ describe("manual deals", () => {
 
   it("cannot be confirmed, because no creator has responded", () => {
     expect(managerConfirmTransition("manual", 15000)).toMatchObject({ ok: false, httpStatus: 409 });
+  });
+});
+
+describe("delivery stages", () => {
+  it("maps each stage to cumulative flags", () => {
+    expect(deliveryStageFlags("not_started", null, "2026-10-20")).toEqual({ contentCreated: false, sentToBrand: false, posted: false, moneyReceived: false, postedDate: null });
+    expect(deliveryStageFlags("content_created", null, "2026-10-20")).toMatchObject({ contentCreated: true, sentToBrand: false, posted: false, moneyReceived: false });
+    expect(deliveryStageFlags("sent_to_brand", null, "2026-10-20")).toMatchObject({ contentCreated: true, sentToBrand: true, posted: false });
+    expect(deliveryStageFlags("settled", null, "2026-10-20")).toEqual({ contentCreated: true, sentToBrand: true, posted: true, moneyReceived: true, postedDate: "2026-10-20" });
+  });
+
+  it("keeps an existing posted date and clears it when the deal is no longer posted", () => {
+    expect(deliveryStageFlags("posted", "2026-10-15", "2026-10-20").postedDate).toBe("2026-10-15");
+    expect(deliveryStageFlags("sent_to_brand", "2026-10-15", "2026-10-20").postedDate).toBeNull();
+  });
+
+  it("reads the stage back from the flags", () => {
+    const base = { contentCreated: false, sentToBrand: false, posted: false, moneyReceived: false };
+    expect(deliveryStageOf(base)).toBe("not_started");
+    expect(deliveryStageOf({ ...base, contentCreated: true })).toBe("content_created");
+    expect(deliveryStageOf({ ...base, contentCreated: true, sentToBrand: true })).toBe("sent_to_brand");
+    expect(deliveryStageOf({ ...base, contentCreated: true, sentToBrand: true, posted: true })).toBe("posted");
+    expect(deliveryStageOf({ contentCreated: true, sentToBrand: true, posted: true, moneyReceived: true })).toBe("settled");
+  });
+
+  it("round-trips every stage", () => {
+    for (const stage of DELIVERY_STAGES) {
+      const flags = deliveryStageFlags(stage, null, "2026-10-20");
+      expect(deliveryStageOf(flags)).toBe(stage);
+    }
+    expect(isDeliveryStage("posted")).toBe(true);
+    expect(isDeliveryStage("bogus")).toBe(false);
+  });
+
+  it("returns the latest creator counter amount from the offer history", () => {
+    expect(latestCounterAmount([])).toBeNull();
+    expect(latestCounterAmount([{ event: "offer", amount: 30000 }, { event: "counter", amount: 25000 }])).toBe(25000);
+    expect(latestCounterAmount([
+      { event: "counter", amount: 25000 }, { event: "offer", amount: 32000 },
+    ])).toBe(25000);
+    expect(latestCounterAmount([{ event: "offer", amount: 32000 }])).toBeNull();
   });
 });

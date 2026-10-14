@@ -57,7 +57,7 @@ describe("GET /api/manager/creators", () => {
     expect(body.creators[0]).toMatchObject({
       dealCount: 4,
       activeDealCount: 2,
-      activeDealValue: 27000,
+      activeDealValue: 18000,
       completedDealCount: 1,
       completedDealValue: 7000,
     });

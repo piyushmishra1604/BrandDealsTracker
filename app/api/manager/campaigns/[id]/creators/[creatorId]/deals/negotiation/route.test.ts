@@ -59,12 +59,12 @@ describe("POST manager confirm", () => {
     const fake = useFake(deal);
     const response = await POST(request({ action: "confirm", note: "Locked in" }), { params });
     expect(response.status).toBe(200);
-    expect(fake.rpcCalls[0].args).toMatchObject({ p_expected_status: "countered", p_event: "confirm", p_actor: "manager", p_note: "Locked in" });
+    expect(fake.rpcCalls[0].args).toMatchObject({ p_expected_status: "countered", p_event: "accept", p_actor: "manager", p_note: "Locked in" });
     expect(fake.rpcCalls[0].args.p_patch).toMatchObject({ acceptanceStatus: "confirmed" });
   });
 
-  it("refuses to confirm a deal the creator has not responded to", async () => {
-    const fake = useFake({ ...deal, acceptanceStatus: "pending" });
+  it("refuses to accept on the creator's behalf once the deal is declined", async () => {
+    const fake = useFake({ ...deal, acceptanceStatus: "declined" });
     const response = await POST(request({ action: "confirm" }), { params });
     expect(response.status).toBe(409);
     expect(fake.rpcCalls).toHaveLength(0);

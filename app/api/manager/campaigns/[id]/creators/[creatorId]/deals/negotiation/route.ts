@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { managerConfirmTransition, isNegotiationNote } from "@/lib/assigned-deals";
+import { managerConfirmTransition, managerDeclineTransition, isNegotiationNote, latestCounterAmount } from "@/lib/assigned-deals";
 import {
   getAuthorizedAssignment, findCampaignCreatorDeal, applyDealChange, loadDealOffers,
 } from "@/lib/assigned-deal-store";
@@ -21,7 +21,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return NextResponse.json({ deal: dealResult.value, offers: offersResult.value });
 }
 
-// Manager confirms the amount the creator accepted, or accepts the creator's counter-offer.
+// Manager confirms the amount the creator accepted (or accepts their counter-offer), or declines an open offer.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {
   const { id, creatorId } = await params;
   const authorized = await getAuthorizedAssignment(id, creatorId);
@@ -30,7 +30,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
-  if ((body as { action?: unknown })?.action !== "confirm") return NextResponse.json({ error: "Unknown action." }, { status: 400 });
+  const action = (body as { action?: unknown })?.action;
+  if (action !== "confirm" && action !== "decline") return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   const note = (body as { note?: unknown }).note;
   if (note !== undefined && !isNegotiationNote(note)) {
     return NextResponse.json({ error: "The note must be 500 characters or fewer." }, { status: 400 });
@@ -42,7 +43,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!deal) return NextResponse.json({ error: "No deal found for this creator on this campaign." }, { status: 404 });
 
   const currentStatus = deal.acceptanceStatus ?? "pending";
-  const transition = managerConfirmTransition(currentStatus, deal.amount);
+  let confirmAmount = deal.amount;
+  if (action === "confirm" && currentStatus === "countered") {
+    const offersResult = await loadDealOffers(supabase, deal.id);
+    if (!offersResult.ok) return NextResponse.json({ error: offersResult.error }, { status: offersResult.status });
+    confirmAmount = latestCounterAmount(offersResult.value) ?? deal.amount;
+  }
+  const transition = action === "decline"
+    ? managerDeclineTransition(currentStatus, deal.amount)
+    : managerConfirmTransition(currentStatus, confirmAmount);
   if (!transition.ok) return NextResponse.json({ error: transition.error }, { status: transition.httpStatus });
 
   const result = await applyDealChange(supabase, {

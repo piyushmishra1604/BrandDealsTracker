@@ -2,6 +2,7 @@ import { type AcceptanceStatus, type Deal, type Deliverable } from "./deals";
 
 // Negotiation rules for deals a manager assigned from a campaign (M5/M6).
 //
+// draft     manager created the deal; not sent to the creator yet, so the creator can't see it
 // pending   manager's offer is open, waiting for the creator
 // countered creator's counter-offer is open, waiting for the manager
 // accepted  creator accepted; waiting for the manager to confirm
@@ -32,10 +33,11 @@ export function isNegotiationNote(value: unknown): value is string {
 }
 
 const WAITING_MESSAGES: Record<AcceptanceStatus, string> = {
+  draft: "The manager has not sent this offer to you yet.",
   pending: "",
   countered: "Waiting for the manager to respond to your counter-offer.",
   accepted: "You have accepted this amount. Waiting for the manager to confirm it.",
-  confirmed: "This deal is confirmed.",
+  confirmed: "You have accepted this deal.",
   declined: "You declined this offer. Waiting for the manager to send a new one.",
   manual: "",
 };
@@ -49,8 +51,9 @@ export function creatorTransition(input: {
   if (input.status !== "pending") {
     return { ok: false, httpStatus: 409, error: WAITING_MESSAGES[input.status] };
   }
+  // Accepting is the final offer step, so the deal moves straight to confirmed (shown as Accepted).
   if (input.action === "accept") {
-    return { ok: true, status: "accepted", event: "accept", actor: "creator", amount: input.amount };
+    return { ok: true, status: "confirmed", event: "accept", actor: "creator", amount: input.amount };
   }
   if (input.action === "decline") {
     return { ok: true, status: "declined", event: "decline", actor: "creator", amount: input.amount };
@@ -69,19 +72,45 @@ export function creatorTransition(input: {
 export function managerOfferTransition(input: { status: AcceptanceStatus; amountChanged: boolean }): OfferTransition {
   // Manual deals were agreed off-platform, so the manager amends them directly with no offer.
   if (input.status === "manual") return { ok: true, status: "manual", event: null };
+  // Saving a draft only edits it. Sending it is a separate step, so the manager can review first.
+  if (input.status === "draft") return { ok: true, status: "draft", event: null };
   if (input.status === "declined") return { ok: true, status: "pending", event: "offer" };
   if (!input.amountChanged) return { ok: true, status: input.status, event: null };
-  if (input.status === "accepted") {
-    return { ok: false, httpStatus: 409, error: "The creator has accepted this amount. Confirm it before changing the amount." };
-  }
+  // A price change after acceptance is a new offer, so the creator has to accept it again.
   return { ok: true, status: "pending", event: "offer" };
 }
 
-export function managerConfirmTransition(status: AcceptanceStatus, amount: number): Transition {
-  if (status === "accepted" || status === "countered") {
-    return { ok: true, status: "confirmed", event: "confirm", actor: "manager", amount };
+// Sending a draft opens the offer for the creator. Only drafts can be sent.
+export function managerSendTransition(status: AcceptanceStatus): OfferTransition {
+  if (status === "draft") return { ok: true, status: "pending", event: "offer" };
+  return { ok: false, httpStatus: 409, error: "Only a created deal that has not been sent can be sent to the creator." };
+}
+
+// A creator's counter-offer stays in the offer history until the manager acts on it; the deal's
+// own amount keeps the last agreed value. Offers are ordered oldest first.
+export function latestCounterAmount(offers: readonly { event: NegotiationEvent; amount: number }[]): number | null {
+  for (let index = offers.length - 1; index >= 0; index--) {
+    if (offers[index].event === "counter") return offers[index].amount;
   }
-  return { ok: false, httpStatus: 409, error: "There is nothing to confirm right now." };
+  return null;
+}
+
+// The manager can mark an offer accepted on the creator's behalf, for example when the creator
+// forgot to respond or has no CollabFlow account.
+export function managerConfirmTransition(status: AcceptanceStatus, amount: number): Transition {
+  if (status === "pending" || status === "countered" || status === "accepted") {
+    return { ok: true, status: "confirmed", event: "accept", actor: "manager", amount };
+  }
+  return { ok: false, httpStatus: 409, error: "This deal is not waiting for acceptance." };
+}
+
+// The manager can decline an offer the creator is still considering or has countered.
+// Declining leaves the deal open, so the manager can send a new offer afterwards.
+export function managerDeclineTransition(status: AcceptanceStatus, amount: number): Transition {
+  if (status === "pending" || status === "countered") {
+    return { ok: true, status: "declined", event: "decline", actor: "manager", amount };
+  }
+  return { ok: false, httpStatus: 409, error: "This deal is not waiting for a response." };
 }
 
 // Fields a creator may change on a deal a manager assigned to them. Everything else
@@ -161,4 +190,70 @@ export function managerAssignedFields(existing: Deal | null, input: ManagerAssig
       : requested.map(item => ({ type: item.type, quantity: item.quantity, done: false })),
     notes: input.notes ?? "",
   };
+}
+
+// Delivery stages are ordered. Each stage implies the flags below it, so a stage
+// maps onto the deal's existing boolean flags without any new columns.
+export const DELIVERY_STAGES = ["not_started", "content_created", "sent_to_brand", "posted", "settled"] as const;
+export type DeliveryStage = (typeof DELIVERY_STAGES)[number];
+
+export const DELIVERY_STAGE_LABELS: Record<DeliveryStage, string> = {
+  not_started: "Not started",
+  content_created: "Content created",
+  sent_to_brand: "Sent to brand",
+  posted: "Posted",
+  settled: "Settled",
+};
+
+export function isDeliveryStage(value: unknown): value is DeliveryStage {
+  return typeof value === "string" && (DELIVERY_STAGES as readonly string[]).includes(value);
+}
+
+export function deliveryStageOf(deal: Pick<Deal, "contentCreated" | "sentToBrand" | "posted" | "moneyReceived">): DeliveryStage {
+  if (deal.moneyReceived) return "settled";
+  if (deal.posted) return "posted";
+  if (deal.sentToBrand) return "sent_to_brand";
+  if (deal.contentCreated) return "content_created";
+  return "not_started";
+}
+
+// Returns the flag values for a stage. The posted date is kept if the deal was already posted,
+// set to today when the deal first moves to posted, and cleared when it is no longer posted.
+export function deliveryStageFlags(stage: DeliveryStage, existingPostedDate: string | null | undefined, today: string) {
+  const index = DELIVERY_STAGES.indexOf(stage);
+  const posted = index >= DELIVERY_STAGES.indexOf("posted");
+  return {
+    contentCreated: index >= DELIVERY_STAGES.indexOf("content_created"),
+    sentToBrand: index >= DELIVERY_STAGES.indexOf("sent_to_brand"),
+    posted,
+    moneyReceived: index >= DELIVERY_STAGES.indexOf("settled"),
+    postedDate: posted ? (existingPostedDate ?? today) : null,
+  };
+}
+
+// The single status shown to managers and creators: the offer state until it is accepted,
+// then the delivery stage.
+export type DealProgress = "draft" | "pending" | "declined" | "accepted" | DeliveryStage;
+
+export function dealProgressOf(deal: Pick<Deal, "acceptanceStatus" | "contentCreated" | "sentToBrand" | "posted" | "moneyReceived">): DealProgress {
+  const status = deal.acceptanceStatus ?? "pending";
+  if (status === "draft") return "draft";
+  if (status === "declined") return "declined";
+  if (status === "pending" || status === "countered") return "pending";
+  const stage = deliveryStageOf(deal);
+  return stage === "not_started" ? "accepted" : stage;
+}
+
+export const DEAL_PROGRESS_LABELS: Record<DealProgress, string> = {
+  draft: "Created",
+  pending: "Pending",
+  declined: "Declined",
+  accepted: "Accepted",
+  ...DELIVERY_STAGE_LABELS,
+  not_started: "Accepted",
+};
+
+// Delivery stages can only be set once the creator has accepted (or the deal was agreed off-platform).
+export function canSetDeliveryStage(status: AcceptanceStatus | null | undefined): boolean {
+  return status === "confirmed" || status === "manual";
 }

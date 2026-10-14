@@ -56,7 +56,7 @@ describe("GET /api/manager/creators/[id]/deals", () => {
     expect(response.status).toBe(200);
     expect(body.deals).toHaveLength(3);
     expect(body.deals[0].campaign.title).toBe("Spring Drop");
-    expect(body.summary).toEqual({ activeCount: 2, activeValue: 27000, completedCount: 1, completedValue: 4000 });
+    expect(body.summary).toEqual({ activeCount: 2, activeValue: 18000, completedCount: 1, completedValue: 4000 });
   });
 
   it("lists only deals attached to this creator, never a creator's personal deals", async () => {

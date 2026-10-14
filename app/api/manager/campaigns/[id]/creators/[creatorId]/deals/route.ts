@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAssignedDealInput, isDeliverables, assignedDealDateError, todayDate, type Deal } from "@/lib/deals";
-import { managerAssignedFields, managerOfferTransition, isNegotiationNote, type ManagerAssignmentInput } from "@/lib/assigned-deals";
+import {
+  managerAssignedFields, managerOfferTransition, managerSendTransition, isNegotiationNote, isDeliveryStage, deliveryStageFlags, canSetDeliveryStage, type ManagerAssignmentInput,
+} from "@/lib/assigned-deals";
 import {
   getAuthorizedAssignment, findCampaignCreatorDeal, applyDealChange, type Supabase,
 } from "@/lib/assigned-deal-store";
@@ -8,8 +10,8 @@ import { notifyDealAssigned } from "@/lib/notification-store";
 
 const NOT_FOUND = { error: "Campaign not found." } as const;
 
-// Linked creators get a pending deal and a notification. Unlinked creators get a manual deal
-// that is recorded off-platform and has no owner until the creator is linked.
+// Linked creators get a draft that the creator can't see until the manager sends it (PATCH with send).
+// Unlinked creators get a manual deal that is recorded off-platform and has no owner until the creator is linked.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {
   const { id, creatorId } = await params;
   const authorized = await getAuthorizedAssignment(id, creatorId);
@@ -34,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (!existing) {
     return createAssignedDeal({
-      supabase, campaign, managerUserId: access.sub, campaignId: id, creatorProfileId: creator.id, linkedUserId: creator.linkedUserId ?? null, input: body, offerNote,
+      supabase, campaign, managerUserId: access.sub, campaignId: id, creatorProfileId: creator.id, isLinked: Boolean(creator.linkedUserId), input: body,
     });
   }
 
@@ -60,12 +62,10 @@ async function createAssignedDeal(input: {
   managerUserId: string;
   campaignId: string;
   creatorProfileId: string;
-  linkedUserId: string | null;
+  isLinked: boolean;
   input: ManagerAssignmentInput;
-  offerNote: string;
 }) {
-  const { supabase, campaign, managerUserId, campaignId, creatorProfileId, linkedUserId, offerNote } = input;
-  const isLinked = linkedUserId !== null;
+  const { supabase, campaign, managerUserId, campaignId, creatorProfileId, isLinked } = input;
   const { data, error } = await supabase.from("deals").insert({
     ...managerAssignedFields(null, input.input, campaign.brand),
     dealDate: todayDate(),
@@ -77,49 +77,66 @@ async function createAssignedDeal(input: {
     campaignId,
     creatorId: creatorProfileId,
     assignedByUserId: managerUserId,
-    acceptanceStatus: isLinked ? "pending" : "manual",
-    user_id: linkedUserId,
+    acceptanceStatus: isLinked ? "draft" : "manual",
+    user_id: null,
   }).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const deal = data as Deal;
-
-  if (!isLinked) return NextResponse.json({ deal });
-
-  // The first offer goes into the history table. If that fails, remove the deal so the
-  // manager can retry instead of being left with a pending deal that has no offer on record.
-  const { error: offerError } = await supabase.from("deal_offers").insert({
-    dealId: deal.id, actor: "manager", event: "offer", amount: deal.amount, note: offerNote,
-  });
-  if (offerError) {
-    await supabase.from("deals").delete().eq("id", deal.id);
-    return NextResponse.json({ error: offerError.message }, { status: 500 });
-  }
-  await notifyDealAssigned(supabase, { userId: linkedUserId, workspaceId: campaign.workspaceId, dealId: deal.id });
-  return NextResponse.json({ deal });
+  return NextResponse.json({ deal: data as Deal });
 }
 
-// Manager edits the deliverable list (add, remove, or tick done). The offer status and amount are unchanged.
+// Manager edits the deliverable list (add, remove, or tick done), the delivery stage, or sends a
+// created deal to the creator. Only sending changes the offer status. Stage and deliverable edits keep it.
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; creatorId: string }> }) {
   const { id, creatorId } = await params;
   const authorized = await getAuthorizedAssignment(id, creatorId);
   if (!authorized) return NextResponse.json(NOT_FOUND, { status: 404 });
-  const { supabase, creator } = authorized;
+  const { campaign, supabase, creator } = authorized;
 
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
-  const deliverables = (body as { deliverables?: unknown } | null)?.deliverables;
-  if (!isDeliverables(deliverables)) return NextResponse.json({ error: "Invalid deliverables." }, { status: 400 });
+  const { deliverables, stage, send, note } = (body as { deliverables?: unknown; stage?: unknown; send?: unknown; note?: unknown } | null) ?? {};
+  if (send !== undefined && send !== true) return NextResponse.json({ error: "Invalid send request." }, { status: 400 });
+  if (send === true && note !== undefined && note !== null && !isNegotiationNote(note)) {
+    return NextResponse.json({ error: "The note must be 500 characters or fewer." }, { status: 400 });
+  }
+  if (send !== true && stage !== undefined && !isDeliveryStage(stage)) return NextResponse.json({ error: "Invalid delivery stage." }, { status: 400 });
+  if (send !== true && stage === undefined && !isDeliverables(deliverables)) return NextResponse.json({ error: "Invalid deliverables." }, { status: 400 });
 
   const existingResult = await findCampaignCreatorDeal(supabase, id, creator.id);
   if (!existingResult.ok) return NextResponse.json({ error: existingResult.error }, { status: existingResult.status });
   const existing = existingResult.value;
   if (!existing) return NextResponse.json({ error: "No deal found for this creator on this campaign." }, { status: 404 });
 
+  if (send === true) {
+    const sendTransition = managerSendTransition(existing.acceptanceStatus ?? "pending");
+    if (!sendTransition.ok) return NextResponse.json({ error: sendTransition.error }, { status: sendTransition.httpStatus });
+    if (!creator.linkedUserId) {
+      return NextResponse.json({ error: "Link this creator to a CollabFlow account before sending the offer." }, { status: 400 });
+    }
+    const sent = await applyDealChange(supabase, {
+      dealId: existing.id,
+      expectedStatus: "draft",
+      patch: { acceptanceStatus: sendTransition.status, user_id: creator.linkedUserId },
+      actor: "manager",
+      event: sendTransition.event,
+      note: typeof note === "string" ? note : "",
+    });
+    if (!sent.ok) return NextResponse.json({ error: sent.error }, { status: sent.status });
+    await notifyDealAssigned(supabase, { userId: creator.linkedUserId, workspaceId: campaign.workspaceId, dealId: existing.id });
+    return NextResponse.json({ deal: sent.value });
+  }
+
   const currentStatus = existing.acceptanceStatus ?? "pending";
+  if (isDeliveryStage(stage) && !canSetDeliveryStage(currentStatus)) {
+    return NextResponse.json({ error: "The creator has to accept this deal before its delivery stage can change." }, { status: 409 });
+  }
+  const patch = isDeliveryStage(stage)
+    ? deliveryStageFlags(stage, existing.postedDate, todayDate())
+    : { deliverables };
   const result = await applyDealChange(supabase, {
     dealId: existing.id,
     expectedStatus: currentStatus,
-    patch: { deliverables },
+    patch,
     actor: null,
     event: null,
   });
