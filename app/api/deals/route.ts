@@ -3,7 +3,7 @@ import { requireCreator } from "@/lib/auth/account";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isDeal, dealDateError, type Deal } from "@/lib/deals";
 import { creatorAssignedEdit, UNASSIGNED_DEAL_FIELDS } from "@/lib/assigned-deals";
-import { visibleCreatorDeals } from "@/lib/assigned-deal-store";
+import { linkedCreatorIds, visibleCreatorDeals } from "@/lib/assigned-deal-store";
 
 export async function GET() {
   const user = await requireCreator();
@@ -30,13 +30,20 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: existing, error: lookupError } = await supabase.from("deals").select("*").eq("id", (deal as Deal).id).maybeSingle();
   if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 });
-  if (existing && existing.user_id !== user.sub) return NextResponse.json({ error: "You don't have access to this deal." }, { status: 403 });
+  // A manager-assigned deal can be saved by the login linked to its creator, even if user_id points at an older login.
+  if (existing && existing.user_id !== user.sub) {
+    const linked = existing.campaignId ? await linkedCreatorIds(supabase, user.sub) : null;
+    if (linked && !linked.ok) return NextResponse.json({ error: linked.error }, { status: linked.status });
+    if (!linked || !linked.value.includes(existing.creatorId)) {
+      return NextResponse.json({ error: "You don't have access to this deal." }, { status: 403 });
+    }
+  }
 
   if (existing?.campaignId) {
     if (!isDeal(existing)) return NextResponse.json({ error: "The saved deal has an unexpected format." }, { status: 500 });
     const edit = creatorAssignedEdit(existing, deal as Deal);
     if (!edit.ok) return NextResponse.json({ error: edit.error }, { status: 400 });
-    const { data, error } = await supabase.from("deals").update(edit.changes).eq("id", existing.id).eq("user_id", user.sub).select().single();
+    const { data, error } = await supabase.from("deals").update(edit.changes).eq("id", existing.id).select().single();
     if (error) return saveError(error);
     if (!isDeal(data)) return NextResponse.json({ error: "The database returned an unexpected result." }, { status: 500 });
     return NextResponse.json({ deal: data });

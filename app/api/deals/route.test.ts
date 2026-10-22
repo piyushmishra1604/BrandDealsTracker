@@ -98,6 +98,21 @@ describe("POST /api/deals for a creator", () => {
     expect(update?.payload).not.toHaveProperty("acceptanceStatus");
   });
 
+  it("lets a linked creator save an assigned deal whose user_id points at another login", async () => {
+    const fake = createFakeSupabase((q: FakeQuery): FakeResult => {
+      if (q.table === "creators") return { data: [{ id: "creator-record-1" }], error: null };
+      if (q.table !== "deals") return { data: null };
+      if (q.op === "select") return { data: { ...assigned, user_id: "older-login", creatorId: "creator-record-1" }, error: null };
+      if (q.op === "update") return { data: { ...assigned, user_id: "older-login", creatorId: "creator-record-1", ...q.payload }, error: null };
+      return { data: null };
+    });
+    state.fake = fake;
+    const response = await post({ ...assigned, user_id: "older-login", creatorId: "creator-record-1", sentToBrand: true, contentCreated: true, deliverables: [{ type: "Reel", quantity: 2, done: false }] });
+    expect(response.status).toBe(200);
+    expect(fake.queries.find((q) => q.table === "creators")?.filters).toEqual({ linkedUserId: "creator-1" });
+    expect(fake.queries.some((q) => q.op === "update")).toBe(true);
+  });
+
   it("rejects a creator edit to a locked field on an assigned deal", async () => {
     const fake = useFake(assigned);
     const response = await post({ ...assigned, amount: 99999 });
