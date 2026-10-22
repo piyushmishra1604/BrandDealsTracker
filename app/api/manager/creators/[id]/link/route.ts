@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Re-verify server-side that this is really a creator account — never trust the
   // client's earlier lookup result on its own.
-  const { data: account } = await supabase.from("app_users").select("id").eq("id", accountId).eq("account_type", "creator").maybeSingle();
+  const { data: account } = await supabase.from("app_users").select("id").eq("id", accountId).contains("account_types", ["creator"]).maybeSingle();
   if (!account) return NextResponse.json({ error: "That account no longer exists or isn't a creator account." }, { status: 400 });
 
   const { data: alreadyLinked } = await supabase

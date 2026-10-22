@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getAccountType } from "@/lib/auth/account";
+import { getAccountTypes } from "@/lib/auth/account";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 
@@ -8,7 +8,7 @@ import { normalizeUsername, validateUsername } from "@/lib/username";
 async function requireAccount() {
   const user = await getCurrentUser();
   if (!user) return null;
-  return (await getAccountType(user.sub)) ? user : null;
+  return (await getAccountTypes(user.sub)).length > 0 ? user : null;
 }
 
 // Live availability check while typing. Always 200 for a well-formed request, so the UI

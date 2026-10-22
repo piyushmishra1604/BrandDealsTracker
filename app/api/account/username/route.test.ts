@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockGetCurrentUser = vi.fn();
 vi.mock("@/lib/auth/session", () => ({ getCurrentUser: () => mockGetCurrentUser() }));
 
-const mockGetAccountType = vi.fn();
-vi.mock("@/lib/auth/account", () => ({ getAccountType: (...args: unknown[]) => mockGetAccountType(...args) }));
+const mockGetAccountTypes = vi.fn();
+vi.mock("@/lib/auth/account", () => ({ getAccountTypes: (...args: unknown[]) => mockGetAccountTypes(...args) }));
 
 const mockMaybeSingle = vi.fn();
 const mockUpdateEq = vi.fn();
@@ -35,10 +35,10 @@ function saveRequest(body: unknown) {
 describe("GET /api/account/username", () => {
   beforeEach(() => {
     mockGetCurrentUser.mockReset();
-    mockGetAccountType.mockReset();
+    mockGetAccountTypes.mockReset();
     mockMaybeSingle.mockReset();
     mockGetCurrentUser.mockResolvedValue(signedIn);
-    mockGetAccountType.mockResolvedValue("creator");
+    mockGetAccountTypes.mockResolvedValue(["creator"]);
   });
 
   it("rejects a signed-out request", async () => {
@@ -78,10 +78,10 @@ describe("GET /api/account/username", () => {
 describe("PATCH /api/account/username", () => {
   beforeEach(() => {
     mockGetCurrentUser.mockReset();
-    mockGetAccountType.mockReset();
+    mockGetAccountTypes.mockReset();
     mockUpdateEq.mockReset();
     mockGetCurrentUser.mockResolvedValue(signedIn);
-    mockGetAccountType.mockResolvedValue("manager");
+    mockGetAccountTypes.mockResolvedValue(["manager"]);
   });
 
   it("rejects a signed-out request", async () => {

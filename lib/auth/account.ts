@@ -8,25 +8,35 @@ function isAccountType(value: unknown): value is AccountType {
   return value === "creator" || value === "manager";
 }
 
-// Account type lives in app_users, not the JWT, so it's always read fresh from the
-// source of truth instead of trusting a claim baked into a (possibly pre-M1) session cookie.
-export async function getAccountType(userId: string): Promise<AccountType | null> {
-  const { data } = await getSupabaseAdmin().from("app_users").select("account_type").eq("id", userId).maybeSingle();
-  return isAccountType(data?.account_type) ? data.account_type : null;
+function isAccountTypeArray(value: unknown): value is AccountType[] {
+  return Array.isArray(value) && value.every(isAccountType);
+}
+
+// An account can hold both a creator and a manager profile under one login, so this
+// returns every role the account has, read fresh from app_users rather than the JWT.
+export async function getAccountTypes(userId: string): Promise<AccountType[]> {
+  const { data } = await getSupabaseAdmin().from("app_users").select("account_types").eq("id", userId).maybeSingle();
+  return isAccountTypeArray(data?.account_types) ? data.account_types : [];
+}
+
+export async function hasAccountType(userId: string, type: AccountType): Promise<boolean> {
+  return (await getAccountTypes(userId)).includes(type);
 }
 
 // Drop-in replacement for getCurrentUser() in creator-only API routes: same { sub, email }
-// shape, but also rejects manager accounts so a 401 is returned instead of leaking access.
+// shape, but also rejects sessions not currently acting as a creator. The active role lives
+// in the session cookie (chosen at login or via switch-role); app_users is re-checked so a
+// removed role can't keep working off a stale cookie.
 export async function requireCreator(): Promise<SessionPayload | null> {
   const user = await getCurrentUser();
-  if (!user) return null;
-  return (await getAccountType(user.sub)) === "creator" ? user : null;
+  if (!user || user.role !== "creator") return null;
+  return (await hasAccountType(user.sub, "creator")) ? user : null;
 }
 
 export async function requireManagerAccount(): Promise<SessionPayload | null> {
   const user = await getCurrentUser();
-  if (!user) return null;
-  return (await getAccountType(user.sub)) === "manager" ? user : null;
+  if (!user || user.role !== "manager") return null;
+  return (await hasAccountType(user.sub, "manager")) ? user : null;
 }
 
 // There's no display-name field on app_users yet, so the top bar derives something

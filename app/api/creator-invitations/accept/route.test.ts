@@ -31,7 +31,7 @@ function makeRequest(body: unknown) {
 
 beforeEach(() => {
   state.user = { sub: "user-kopal", email: "kopal@example.com" };
-  account = { id: "user-kopal", email: "kopal@example.com", account_type: "creator" };
+  account = { id: "user-kopal", email: "kopal@example.com", account_types: ["creator"] };
   invitation = { id: "inv-1", creatorId: "creator-1", email: "kopal@example.com", status: "pending", expiresAt: FUTURE, acceptedByUserId: null };
   creator = { id: "creator-1", workspaceId: "ws-a", linkedUserId: null, archivedAt: null };
   alreadyLinked = null;
@@ -67,7 +67,7 @@ describe("POST /api/creator-invitations/accept", () => {
   });
 
   it("rejects a manager account", async () => {
-    account = { id: "user-kopal", email: "kopal@example.com", account_type: "manager" };
+    account = { id: "user-kopal", email: "kopal@example.com", account_types: ["manager"] };
     const response = await POST(makeRequest({ token: TOKEN }));
     expect(response.status).toBe(403);
     expect(queries.some((q) => q.op === "update")).toBe(false);
@@ -107,7 +107,7 @@ describe("POST /api/creator-invitations/accept", () => {
   });
 
   it("refuses when the signed-in account has a different email", async () => {
-    account = { id: "user-kopal", email: "someone-else@example.com", account_type: "creator" };
+    account = { id: "user-kopal", email: "someone-else@example.com", account_types: ["creator"] };
     const response = await POST(makeRequest({ token: TOKEN }));
     const body = await response.json();
     expect(response.status).toBe(403);
@@ -116,7 +116,7 @@ describe("POST /api/creator-invitations/accept", () => {
   });
 
   it("accepts an email that differs only by case", async () => {
-    account = { id: "user-kopal", email: "Kopal@Example.com", account_type: "creator" };
+    account = { id: "user-kopal", email: "Kopal@Example.com", account_types: ["creator"] };
     const response = await POST(makeRequest({ token: TOKEN }));
     expect(response.status).toBe(200);
   });

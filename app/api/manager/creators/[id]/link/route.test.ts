@@ -19,7 +19,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         return { select: () => ({ eq: () => ({ maybeSingle: () => mockCreatorMaybeSingle() }) }) };
       }
       if (table === "app_users") {
-        return { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => mockAccountMaybeSingle() }) }) }) };
+        return { select: () => ({ eq: () => ({ contains: () => ({ maybeSingle: () => mockAccountMaybeSingle() }) }) }) };
       }
       // Second "creators" table access: the already-linked-elsewhere check.
       return {

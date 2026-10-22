@@ -32,37 +32,37 @@ describe("getWorkspaceRole", () => {
 describe("requireWorkspaceAccess", () => {
   beforeEach(() => { mockMaybeSingle.mockReset(); mockGetCurrentUser.mockReset(); });
 
-  it("rejects a creator account outright, before even checking membership", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-1", email: "a@example.com" });
-    mockMaybeSingle.mockResolvedValueOnce({ data: { account_type: "creator" } });
+  it("rejects a creator-role session outright, before even checking membership", async () => {
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "creator" });
+    mockMaybeSingle.mockResolvedValueOnce({ data: { account_types: ["creator"] } });
     expect(await requireWorkspaceAccess("workspace-a")).toBeNull();
   });
 
   it("rejects a manager who belongs to a different agency (cross-agency isolation)", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com" });
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com", role: "manager" });
     mockMaybeSingle
-      .mockResolvedValueOnce({ data: { account_type: "manager" } }) // account type check
+      .mockResolvedValueOnce({ data: { account_types: ["manager"] } }) // account type check
       .mockResolvedValueOnce({ data: null }); // no membership row for this workspace
     expect(await requireWorkspaceAccess("someone-elses-workspace")).toBeNull();
   });
 
   it("rejects a forged/empty workspace_id", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com" });
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com", role: "manager" });
     expect(await requireWorkspaceAccess("")).toBeNull();
   });
 
   it("rejects a member role when an owner-level action is required", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com" });
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com", role: "manager" });
     mockMaybeSingle
-      .mockResolvedValueOnce({ data: { account_type: "manager" } })
+      .mockResolvedValueOnce({ data: { account_types: ["manager"] } })
       .mockResolvedValueOnce({ data: { role: "member" } });
     expect(await requireWorkspaceAccess("workspace-a", "owner")).toBeNull();
   });
 
   it("grants access to a verified member of their own workspace", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com" });
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com", role: "manager" });
     mockMaybeSingle
-      .mockResolvedValueOnce({ data: { account_type: "manager" } })
+      .mockResolvedValueOnce({ data: { account_types: ["manager"] } })
       .mockResolvedValueOnce({ data: { role: "owner" } });
     expect(await requireWorkspaceAccess("workspace-a")).toEqual({ sub: "user-2", email: "m@example.com", role: "owner" });
   });

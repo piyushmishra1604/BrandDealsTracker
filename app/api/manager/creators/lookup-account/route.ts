@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     .from("app_users")
     .select("id, email")
     .eq("email", email)
-    .eq("account_type", "creator")
+    .contains("account_types", ["creator"])
     .maybeSingle();
 
   if (!account) return NextResponse.json({ error: "No creator account found with that email." }, { status: 404 });

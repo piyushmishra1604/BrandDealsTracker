@@ -3,6 +3,7 @@
 import { LayoutDashboard, Mail, FileText, User, Settings } from "lucide-react";
 import { NavShell, type NavItem } from "./nav-shell";
 import { NotificationBell } from "./notification-bell";
+import { RoleSwitcher } from "./role-switcher";
 
 const navigation: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, tint: "text-blue-600 bg-blue-50" },
@@ -13,5 +14,5 @@ const navigation: NavItem[] = [
 ];
 
 export function Sidebar() {
-  return <NavShell brand="CollabFlow" navigation={navigation} footerExtra={<div className="mt-3 flex justify-start"><NotificationBell placement="top-start" /></div>} />;
+  return <NavShell brand="CollabFlow" navigation={navigation} footerExtra={<><div className="mt-3 flex justify-start"><NotificationBell placement="top-start" /></div><RoleSwitcher /></>} />;
 }

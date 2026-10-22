@@ -10,24 +10,38 @@ vi.mock("@/lib/supabase/admin", () => ({
 const mockGetCurrentUser = vi.fn();
 vi.mock("./session", () => ({ getCurrentUser: () => mockGetCurrentUser() }));
 
-const { getAccountType, requireCreator, requireManagerAccount } = await import("./account");
+const { getAccountTypes, hasAccountType, requireCreator, requireManagerAccount } = await import("./account");
 
-describe("getAccountType", () => {
+describe("getAccountTypes", () => {
   beforeEach(() => mockMaybeSingle.mockReset());
 
-  it("reads the account type from app_users", async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { account_type: "manager" } });
-    expect(await getAccountType("user-1")).toBe("manager");
+  it("reads every role the account has from app_users", async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["creator", "manager"] } });
+    expect(await getAccountTypes("user-1")).toEqual(["creator", "manager"]);
   });
 
-  it("returns null for an unrecognized value, failing closed", async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { account_type: "admin" } });
-    expect(await getAccountType("user-1")).toBeNull();
+  it("returns an empty list for an unrecognized value, failing closed", async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["admin"] } });
+    expect(await getAccountTypes("user-1")).toEqual([]);
   });
 
-  it("returns null when no matching user row exists", async () => {
+  it("returns an empty list when no matching user row exists", async () => {
     mockMaybeSingle.mockResolvedValue({ data: null });
-    expect(await getAccountType("missing")).toBeNull();
+    expect(await getAccountTypes("missing")).toEqual([]);
+  });
+});
+
+describe("hasAccountType", () => {
+  beforeEach(() => mockMaybeSingle.mockReset());
+
+  it("is true when the account holds that role", async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["creator", "manager"] } });
+    expect(await hasAccountType("user-1", "manager")).toBe(true);
+  });
+
+  it("is false when the account doesn't hold that role", async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["creator"] } });
+    expect(await hasAccountType("user-1", "manager")).toBe(false);
   });
 });
 
@@ -39,15 +53,21 @@ describe("requireCreator", () => {
     expect(await requireCreator()).toBeNull();
   });
 
-  it("returns the session for a creator account (existing creator flows keep working)", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-1", email: "a@example.com" });
-    mockMaybeSingle.mockResolvedValue({ data: { account_type: "creator" } });
-    expect(await requireCreator()).toEqual({ sub: "user-1", email: "a@example.com" });
+  it("returns the session for a creator-role session (existing creator flows keep working)", async () => {
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "creator" });
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["creator"] } });
+    expect(await requireCreator()).toEqual({ sub: "user-1", email: "a@example.com", role: "creator" });
   });
 
-  it("rejects a manager account hitting a creator-only route (unauthorized write/read guard)", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com" });
-    mockMaybeSingle.mockResolvedValue({ data: { account_type: "manager" } });
+  it("rejects a session currently acting as manager, even on a dual-role account", async () => {
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com", role: "manager" });
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["creator", "manager"] } });
+    expect(await requireCreator()).toBeNull();
+  });
+
+  it("rejects a creator-role session whose account no longer has that role", async () => {
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-2", email: "m@example.com", role: "creator" });
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["manager"] } });
     expect(await requireCreator()).toBeNull();
   });
 });
@@ -55,15 +75,15 @@ describe("requireCreator", () => {
 describe("requireManagerAccount", () => {
   beforeEach(() => { mockMaybeSingle.mockReset(); mockGetCurrentUser.mockReset(); });
 
-  it("rejects a creator account hitting a manager-only route", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-1", email: "a@example.com" });
-    mockMaybeSingle.mockResolvedValue({ data: { account_type: "creator" } });
+  it("rejects a creator-role session hitting a manager-only route", async () => {
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-1", email: "a@example.com", role: "creator" });
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["creator"] } });
     expect(await requireManagerAccount()).toBeNull();
   });
 
-  it("returns the session for a manager account", async () => {
-    mockGetCurrentUser.mockResolvedValue({ sub: "user-3", email: "m@example.com" });
-    mockMaybeSingle.mockResolvedValue({ data: { account_type: "manager" } });
-    expect(await requireManagerAccount()).toEqual({ sub: "user-3", email: "m@example.com" });
+  it("returns the session for a manager-role session", async () => {
+    mockGetCurrentUser.mockResolvedValue({ sub: "user-3", email: "m@example.com", role: "manager" });
+    mockMaybeSingle.mockResolvedValue({ data: { account_types: ["manager"] } });
+    expect(await requireManagerAccount()).toEqual({ sub: "user-3", email: "m@example.com", role: "manager" });
   });
 });

@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 type AccountType = "creator" | "manager";
-type CurrentUser = { id: string; email: string; accountType: AccountType };
+type CurrentUser = { id: string; email: string; accountType: AccountType; accountTypes: AccountType[] };
 
 // Optimistic, client-side routing: sends an account to its own area if it lands on the
 // other one. The real enforcement lives server-side, in each API route and in

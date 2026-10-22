@@ -11,6 +11,9 @@ function getSecret() {
 export type SessionPayload = {
   sub: string;
   email: string;
+  // Which profile this session is currently acting as. An account can hold both a
+  // creator and a manager profile, so this is the active one, not the only one.
+  role: "creator" | "manager";
 };
 
 export async function signSessionToken(payload: SessionPayload) {
@@ -25,6 +28,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   try {
     const { payload } = await jwtVerify(token, getSecret());
     if (typeof payload.sub !== "string" || typeof payload.email !== "string") return null;
-    return { sub: payload.sub, email: payload.email };
+    if (payload.role !== "creator" && payload.role !== "manager") return null;
+    return { sub: payload.sub, email: payload.email, role: payload.role };
   } catch { return null; }
 }

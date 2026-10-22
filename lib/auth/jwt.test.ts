@@ -4,8 +4,8 @@ import { signSessionToken, verifySessionToken } from "./jwt";
 
 describe("session tokens", () => {
   it("round-trips a valid session", async () => {
-    const token = await signSessionToken({ sub: "user-1", email: "a@example.com" });
-    expect(await verifySessionToken(token)).toEqual({ sub: "user-1", email: "a@example.com" });
+    const token = await signSessionToken({ sub: "user-1", email: "a@example.com", role: "creator" });
+    expect(await verifySessionToken(token)).toEqual({ sub: "user-1", email: "a@example.com", role: "creator" });
   });
 
   it("rejects a garbage/forged token", async () => {
@@ -14,7 +14,7 @@ describe("session tokens", () => {
 
   it("rejects a token signed with a different secret (forged credentials)", async () => {
     const secret = new TextEncoder().encode("a-completely-different-secret-0123456789");
-    const forged = await new SignJWT({ sub: "attacker", email: "attacker@example.com" })
+    const forged = await new SignJWT({ sub: "attacker", email: "attacker@example.com", role: "creator" })
       .setProtectedHeader({ alg: "HS256" })
       .setExpirationTime("30d")
       .sign(secret);
@@ -23,7 +23,7 @@ describe("session tokens", () => {
 
   it("rejects an expired session", async () => {
     const secret = new TextEncoder().encode(process.env.AUTH_JWT_SECRET!);
-    const expired = await new SignJWT({ sub: "user-1", email: "a@example.com" })
+    const expired = await new SignJWT({ sub: "user-1", email: "a@example.com", role: "creator" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt(Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 40)
       .setExpirationTime(Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 10) // expired 10 days ago
@@ -33,10 +33,19 @@ describe("session tokens", () => {
 
   it("rejects a payload missing required claims", async () => {
     const secret = new TextEncoder().encode(process.env.AUTH_JWT_SECRET!);
-    const incomplete = await new SignJWT({ sub: "user-1" }) // no email claim
+    const incomplete = await new SignJWT({ sub: "user-1" }) // no email/role claims
       .setProtectedHeader({ alg: "HS256" })
       .setExpirationTime("30d")
       .sign(secret);
     expect(await verifySessionToken(incomplete)).toBeNull();
+  });
+
+  it("rejects a payload with an unrecognized role claim", async () => {
+    const secret = new TextEncoder().encode(process.env.AUTH_JWT_SECRET!);
+    const badRole = await new SignJWT({ sub: "user-1", email: "a@example.com", role: "admin" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setExpirationTime("30d")
+      .sign(secret);
+    expect(await verifySessionToken(badRole)).toBeNull();
   });
 });

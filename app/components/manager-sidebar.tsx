@@ -2,6 +2,7 @@
 
 import { LayoutDashboard, Megaphone, Users, Mail, FileText, BarChart3, UsersRound, Settings, BadgeCheck } from "lucide-react";
 import { NavShell, type NavItem } from "./nav-shell";
+import { RoleSwitcher } from "./role-switcher";
 
 const navigation: NavItem[] = [
   { label: "Dashboard", href: "/manager", icon: LayoutDashboard, tint: "text-blue-600 bg-blue-50" },
@@ -21,6 +22,7 @@ export function ManagerSidebar({ workspaceName }: { workspaceName: string }) {
       brand={workspaceName}
       subtitle="Manager Workspace"
       navigation={navigation}
+      footerExtra={<RoleSwitcher />}
     />
   );
 }

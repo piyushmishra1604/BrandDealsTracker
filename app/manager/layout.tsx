@@ -5,8 +5,8 @@ import { ManagerSidebar } from "../components/manager-sidebar";
 import { TopBar } from "../components/top-bar";
 
 // Server-side guard (WP1.6): this runs on every hard navigation/reload into /manager.
-// account_type never changes mid-session, so checking it once here is safe — unlike
-// per-resource checks (e.g. "does this user belong to this workspace"), which vary by
+// The session's active role never changes mid-request, so checking it once here is safe —
+// unlike per-resource checks (e.g. "does this user belong to this workspace"), which vary by
 // page and must be re-verified in each page/route per Next.js's data-access-layer guidance.
 export default async function ManagerLayout({ children }: { children: ReactNode }) {
   const { user, workspace } = await requireManagerWorkspace();

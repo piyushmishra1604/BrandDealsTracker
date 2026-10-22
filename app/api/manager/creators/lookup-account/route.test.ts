@@ -7,6 +7,7 @@ const mockMaybeSingle = vi.fn();
 const supabaseChain = {
   select: () => supabaseChain,
   eq: () => supabaseChain,
+  contains: () => supabaseChain,
   maybeSingle: () => mockMaybeSingle(),
 };
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({ from: () => supabaseChain }) }));

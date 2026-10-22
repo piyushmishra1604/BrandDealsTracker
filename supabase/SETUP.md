@@ -50,10 +50,11 @@ Signup is open to anyone with an email/password (8-200 chars); a session is crea
 
 ## Manager accounts and agency workspaces
 
-Every account now has an `account_type` of `creator` or `manager`, chosen at signup and immutable afterward. Creators keep using the app exactly as before (`deals`, `outreach`, `invoices`, `profile`, all scoped by `user_id`). Manager accounts instead belong to one or more `workspaces` (agencies) via `workspace_members`, with `owner`/`manager`/`member` roles. A creator account can never join a workspace, and a manager account can never own creator records — this is enforced both in application code and by a database trigger on `workspace_members`.
+Every account has `account_types`, an array holding one or both of `creator`/`manager`. Signing up a second time with the same email+password adds the other profile to the same account instead of creating a new one. A session acts as exactly one role at a time (chosen at login, or swapped via `/api/auth/switch-role` without logging out). Creators keep using the app exactly as before (`deals`, `outreach`, `invoices`, `profile`, all scoped by `user_id`). Manager accounts instead belong to one or more `workspaces` (agencies) via `workspace_members`, with `owner`/`manager`/`member` roles. An account acting only as a creator can never join a workspace, and the manager side of an account can never own creator records — this is enforced both in application code and by a database trigger on `workspace_members`.
 
 Run these migrations in order after the earlier ones:
 - `202610090002_add_account_type.sql`
 - `202610090003_create_workspaces.sql`
+- `202610220001_multi_role_accounts.sql`
 
 Signing up as a manager also creates the agency's first workspace (named during signup) and adds the new account as its `owner`.

@@ -17,8 +17,8 @@ export async function POST(request: Request) {
   if (typeof token !== "string" || !token) return NextResponse.json({ error: "This invitation link is incomplete." }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
-  const { data: account } = await supabase.from("app_users").select("id, email, account_type").eq("id", user.sub).maybeSingle();
-  if (!account || account.account_type !== "creator") return NextResponse.json({ error: "Only creator accounts can accept invitations." }, { status: 403 });
+  const { data: account } = await supabase.from("app_users").select("id, email, account_types").eq("id", user.sub).maybeSingle();
+  if (!account || !account.account_types?.includes("creator")) return NextResponse.json({ error: "Only creator accounts can accept invitations." }, { status: 403 });
 
   const { data: invitation } = await supabase
     .from("creator_invitations")
