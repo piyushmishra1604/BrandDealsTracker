@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { UserPlus } from "lucide-react";
 import { CloudCreators } from "./cloud-creators";
 import { CreatorTable } from "./creator-table";
 
@@ -14,9 +16,14 @@ export function CreatorManagementClient({ workspaceId }: { workspaceId: string }
 
   return (
     <div>
-      <div className="mb-9 sm:mb-10">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Talent Management</h1>
-        <p className="mt-1.5 text-sm text-[#53668e] sm:text-base">Creators your agency manages, with their deals across every campaign.</p>
+      <div className="mb-9 flex flex-wrap items-start justify-between gap-4 sm:mb-10">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Talent Management</h1>
+          <p className="mt-1.5 text-sm text-[#53668e] sm:text-base">Creators your agency manages, with their deals across every campaign.</p>
+        </div>
+        <Link href="/manager/creators/new" className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-accent-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+          <UserPlus className="h-4 w-4" strokeWidth={2.4} /> Add Creator
+        </Link>
       </div>
 
       <CloudCreators workspaceId={workspaceId}>

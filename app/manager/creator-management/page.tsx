@@ -2,6 +2,6 @@ import { requireManagerWorkspace } from "@/lib/auth/workspace";
 import { CreatorManagementClient } from "../../components/creator-management-client";
 
 export default async function CreatorManagementPage() {
-  const { workspace } = await requireManagerWorkspace();
+  const { workspace } = await requireManagerWorkspace(["talent"]);
   return <CreatorManagementClient workspaceId={workspace.id} />;
 }

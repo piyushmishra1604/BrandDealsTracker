@@ -16,7 +16,7 @@ export default async function ManagerLayout({ children }: { children: ReactNode 
   return (
     <div className="min-h-screen bg-[#f0f4f9] p-2 text-[#101c40] sm:p-4">
       <div className="mx-auto flex min-h-[calc(100dvh-2rem)] max-w-[1600px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_32px_#20345c08] md:flex-row">
-        <ManagerSidebar workspaceName={workspace.name} />
+        <ManagerSidebar workspaceName={workspace.name} focus={workspace.focus} />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar userName={userName} userRole={roleLabel} searchPlaceholder="Search campaigns, creators, brands…" />
           <main id="manager-dashboard" className="min-w-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8 sm:py-8 lg:px-10">

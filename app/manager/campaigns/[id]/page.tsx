@@ -7,7 +7,7 @@ import { CampaignDetailClient } from "../../../components/campaign-detail-client
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // Confirms this is a manager account at all (redirects home otherwise); the
   // specific-campaign check below is what actually authorizes this page's data.
-  await requireManagerWorkspace();
+  await requireManagerWorkspace(["campaigns"]);
   const { id } = await params;
 
   const { data: campaign } = await getSupabaseAdmin().from("campaigns").select("*").eq("id", id).maybeSingle();
